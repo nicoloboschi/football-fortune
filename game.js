@@ -351,7 +351,7 @@ const TASKS = {
 
   week(s) {
     log(s, `— Stagione ${s.season}, settimana ${s.week + 1}: ${weekLabel(s)} —`);
-    after(s, ...active(s).map(m => ({ k: 'turn', m: m.i })), { k: 'play' });
+    after(s, ...active(s).map(m => ({ k: 'turn', m: m.i })), { k: 'preview' }, { k: 'play' });
     return true;
   },
 
@@ -590,6 +590,14 @@ const TASKS = {
     return true;
   },
 
+  // the human's next match, shown before kick-off so the formation can still change
+  preview(s, t) {
+    const h = human(s);
+    if (t.input || h.bankrupt || !playsThisWeek(s, h) || !nextMatch(s, h)) return true;
+    s.pending = { type: 'preview' };
+    return false;
+  },
+
   play(s, t) {
     if (!t.lines) t.lines = playWeek(s);
     if (!t.input && !human(s).bankrupt) { s.pending = { type: 'results', lines: t.lines }; return false; }
@@ -618,6 +626,31 @@ const TASKS = {
 
   over(s, t) { s.pending = { type: 'over', why: t.why }; s.finished = true; return false; },
 };
+
+// Who the manager meets this week: { h, a } home and away club, or null when not known yet.
+export function nextMatch(s, m) {
+  const [type, round] = D.CALENDAR[s.week], c = m.club, pair = (x, y) => x === c || y === c ? { h: x, a: y } : null;
+  if (type === 'L') return s.fixtures[round - 1].map(([x, y]) => pair(x, y)).find(Boolean) || null;
+  if (type === 'F') {
+    if (!s.fa) return null;
+    const sl = s.fa.slots, H = sl.length / 2;
+    for (let z = 0; z < H; z++) { const p = pair(sl[z], sl[z + H]); if (p) return p; }
+    return null;
+  }
+  for (const k of ['EC', 'CWC']) {
+    const e = s.euro[k], j = e.ms.indexOf(m.i);
+    if (j < 0) continue;
+    const clubs = e.ms.map(i => s.managers[i].club);
+    if (clubs.length === 2 && e.meet) return { h: clubs[0], a: clubs[1] };
+    return { h: c, a: e.opps[(e.i + j) % e.opps.length] };
+  }
+  const u = s.euro.UEFA, j = u.ms.indexOf(m.i);
+  if (j < 0) return null;
+  if (round === 1) return { h: c, a: u.pool[j] };
+  const H = D.CUP_TEAMS[round - 1] / 2;
+  for (let z = 0; z < H; z++) { const p = pair(u.pool[z], u.pool[z + H]); if (p) return p; }
+  return null;
+}
 
 export function weekLabel(s) {
   const [type, r] = D.CALENDAR[s.week];
@@ -692,7 +725,7 @@ export function act(s, input) {
   const mine = pid => s.owner[pid] === h.i && !loanOf(s, pid);
   const ok = {
     roll: () => input.type === 'roll',
-    info: () => input.type === 'ok', results: () => input.type === 'ok',
+    info: () => input.type === 'ok', results: () => input.type === 'ok', preview: () => input.type === 'ok',
     choose: () => input.type === 'choose' && p.options.some(o => o.id === input.id),
     pick: () => (input.type === 'pick' && p.pids.includes(input.pid)) || (input.type === 'skip' && p.optional),
     sell: () => (input.type === 'sell' && mine(input.pid)) || (input.type === 'done' && !p.forced),

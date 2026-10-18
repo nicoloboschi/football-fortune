@@ -36,15 +36,77 @@ function cardHTML(p, footer = '', { tags = '', big = false } = {}) {
     <div class="role">${D.POS_NAME[p.pos].toUpperCase()}</div>${tags ? `<div class="ctags">${tags}</div>` : ''}${footer ? `<div class="cfoot">${footer}</div>` : ''}</div>`;
 }
 const cards = list => `<div class="cards">${list.join('')}</div>`;
+// squads always grouped by role, best first in each group
+const ROLES = { G: 'Portieri', D: 'Difensori', M: 'Centrocampisti', A: 'Attaccanti', U: 'Jolly' };
+const byRole = (pids, fn) => Object.keys(ROLES).map(pos => { const ps = pids.filter(p => P(p).pos === pos).sort((x, y) => P(y).stars - P(x).stars);
+  return ps.length ? `<div class="rolehead ${pos}">${ROLES[pos]} · ${ps.length}</div>${cards(ps.map(fn))}` : ''; }).join('');
+const short = n => n >= 1e6 ? `€${(n / 1e6).toFixed(1).replace('.', ',')}M` : `€${Math.round(n / 1000)}k`;
+const posTxt = t => t <= 10 && s.pos[t] ? `${s.pos[t]}°` : '';
+const tacticsHTML = m => `<div class="tactics">${g.FORMATIONS.map(f => { const l = g.lineup(s, m, { f });
+  return btn(`<b>${f}</b><small>${l.full ? `Dif ${l.def} · Att ${l.att}` : 'incompleto'}</small>`, { type: 'formation', f }, { cls: (m.formation || '4-3-3') === f ? 'on' : 'alt' }); }).join('')}</div>`;
+// a club's current Defence/Attack: live line-up for a coach's club, last known numbers otherwise
+function strengthOf(t) {
+  const m = g.managerOf(s, t);
+  if (!m) return { d: s.D[t], a: s.A[t], m: null };
+  const l = g.lineup(s, m); return { d: l.def, a: l.att, m };
+}
+
+// every coach at a glance: league position, Defence/Attack, cash
+function coachesHTML() {
+  return `<div class="coaches">${g.active(s).sort((x, y) => s.pos[x.club] - s.pos[y.club]).map(m => { const l = g.lineup(s, m);
+    return `<button class="coach${m.human ? ' me' : ''}" data-team="${m.club}">${crest(m.club, 16)}<span><b>${s.pos[m.club]}° ${esc(m.name)}</b>
+      <small>D${l.def} A${l.att} · ${short(m.cash)}</small></span></button>`; }).join('')}</div>`;
+}
+
+// my squad under an auction, and what the player on sale would change
+function mySquadHTML(pid) {
+  const h = me(), now = g.lineup(s, h), wit = g.lineup(s, h, { add: pid }), xi = new Set(now.xi);
+  const diff = (x, y) => x === y ? `${y}` : `${x} → <b class="${y > x ? 'win' : 'loss'}">${y}</b>`;
+  return `<div class="rhead">La tua rosa · ${esc(h.formation || '4-3-3')}</div>
+    <div class="muted">Con lui: Difesa ${diff(now.def, wit.def)} · Attacco ${diff(now.att, wit.att)}${wit.xi.includes(pid) ? ' · sarebbe titolare' : ' · sarebbe riserva'}</div>
+    ${byRole(g.squad(s, h), p => cardHTML(P(p), '', { tags: xi.has(p) ? '<span class="tag">titolare</span>' : '<span class="tag">riserva</span>' }))}`;
+}
+
+function previewHTML() {
+  const h = me(), x = g.nextMatch(s, h), [type, round] = D.CALENDAR[s.week];
+  const side = t => { const st = strengthOf(t);
+    return `<div class="vside${st.m?.human ? ' me' : ''}">${crest(t, 46)}<b>${esc(D.TEAMS[t])}</b>
+      <small>${posTxt(t) ? posTxt(t) + ' in classifica' : '&nbsp;'}</small><small>${st.m ? dot(st.m.i) + ' ' + esc(st.m.name) + ' · ' + esc(st.m.formation || '4-3-3') : 'computer'}</small>
+      <div class="da">Dif <i>${st.d}</i> · Att <i>${st.a}</i></div></div>`; };
+  const others = type === 'L' ? s.fixtures[round - 1].filter(([p, q]) => p !== x.h || q !== x.a).map(([p, q]) =>
+    `<div class="fx"><span>${posTxt(p)}</span>${club(p, 18)}<i>–</i>${club(q, 18)}<span>${posTxt(q)}</span></div>`).join('') : '';
+  return `<div class="card hero"><h2>Prossima partita</h2><h3>${esc(g.weekLabel(s))}</h3>
+    <div class="versus">${side(x.h)}<div class="vs">VS</div>${side(x.a)}</div>
+    <div class="rhead">Il tuo modulo</div>${tacticsHTML(h)}
+    <div class="muted">Gol: (tuo Attacco − loro Difesa) ÷ 3, più un po' di fortuna.</div>
+    ${others ? `<div class="rhead">Le altre partite</div>${others}` : ''}
+    ${btn('⚽  Gioca la partita', { type: 'ok' }, { cls: 'big' })}</div>`;
+}
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
 function send(input) {
   const prev = s.pending, tick = s.tick || 0;
-  if (input.type === 'roll') { const from = me().sq; g.act(s, input); lastDie = (me().sq - from + 36) % 36 || null; save(); return rollAnim(from); }
+  if (input.type === 'roll') { const from = me().sq; g.act(s, input); lastDie = (me().sq - from + 36) % 36 || null; save(); return rollAnim(from).then(() => toasts(tick)); }
   g.act(s, input);
   save(); render();
   window.scrollTo({ top: 0, behavior: 'smooth' });
   if (prev?.type === 'auction' && !(s.pending?.type === 'auction' && s.pending.pid === prev.pid)) auctionResult(prev.pid, tick);
+  toasts(tick);
+}
+
+// What the other coaches just did, as notes that slide in and fade away on their own (tap to dismiss).
+function toasts(tick) {
+  const news = s.log.filter(l => l.t > tick && l.mi != null && l.mi !== 0 && !l.text.startsWith('—')).reverse().slice(-4);
+  let box = document.querySelector('.toasts');
+  if (!box) { box = document.createElement('div'); box.className = 'toasts'; document.body.appendChild(box); }
+  news.forEach((l, i) => {
+    const el = document.createElement('div');
+    el.className = 'toast'; el.style.animationDelay = `${i * 500}ms, ${i * 500 + 3200}ms`;
+    el.innerHTML = `${dot(l.mi)}<span>${esc(l.text)}</span>`;
+    el.addEventListener('click', () => el.remove());
+    el.addEventListener('animationend', e => { if (e.animationName === 'tout') el.remove(); });
+    box.appendChild(el);
+  });
 }
 
 // Die tumbles, lands on the number, then my token hops square by square.
@@ -114,7 +176,7 @@ function boardHTML() {
 function matchHTML(l) {
   const mineH = l.mh === 0, mineA = l.ma === 0, mine = mineH || mineA;
   const team = (t, mi, d, a, away) => `<div class="team${away ? ' away' : ''}${mi === 0 ? ' me' : ''}">
-    <div class="tn">${away ? '' : crest(t, 20)}<span>${esc(D.TEAMS[t])}</span>${away ? crest(t, 20) : ''}</div>
+    <div class="tn">${away ? '' : crest(t, 20)}<span>${esc(D.TEAMS[t])}${posTxt(t) ? ` <em>${posTxt(t)}</em>` : ''}</span>${away ? crest(t, 20) : ''}</div>
     <div class="da">${!away && mi != null ? dot(mi) + ' ' : ''}Dif <i>${d}</i> · Att <i>${a}</i>${away && mi != null ? ' ' + dot(mi) : ''}</div></div>`;
   const my = mineH ? l.x : l.y, their = mineH ? l.y : l.x;
   const cls = !mine ? '' : my > their ? 'win' : my < their ? 'loss' : '';
@@ -130,27 +192,31 @@ function pendingHTML() {
     case 'roll': return `<div class="card hero"><h2>Tocca a te</h2><h3>${esc(g.weekLabel(s))}</h3>
       <div class="muted">${g.playsThisWeek(s, h) ? 'Questa settimana giochi.' : 'Questa settimana non giochi.'} Prima di tirare puoi comprare dalla banca o fare offerte nel Mercato.</div>
       ${btn('🎲  Tira il dado', { type: 'roll' }, { cls: 'big' })}</div>`;
+    case 'preview': return previewHTML();
     case 'info': return `<div class="card hero"><h2>${esc(p.title)}</h2><div class="cardtext">${esc(p.text)}</div>${btn('OK', { type: 'ok' }, { cls: 'big' })}</div>`;
     case 'choose': return `<div class="card hero"><h2>${esc(p.title)}</h2><div class="cardtext">${esc(p.text)}</div>
       <div class="stack">${p.options.map((o, i) => btn(esc(o.label), { type: 'choose', id: o.id }, { cls: i ? 'alt' : '' })).join('')}</div></div>`;
     case 'pick': return `<div class="card hero"><h2>${esc(p.title)}</h2><div class="muted">${esc(p.text)}</div>
-      ${cards(p.pids.map(pid => cardHTML(P(pid), btn(p.prices ? g.money(p.prices[pid]) : 'Scegli', { type: 'pick', pid }, { cls: 'small', dis: p.prices && p.title.startsWith('Compra') && p.prices[pid] > h.cash }))))}
+      ${byRole(p.pids, pid => cardHTML(P(pid), btn(p.prices ? g.money(p.prices[pid]) : 'Scegli', { type: 'pick', pid }, { cls: 'small', dis: p.prices && p.title.startsWith('Compra') && p.prices[pid] > h.cash })))}
       ${p.optional ? btn('Salta', { type: 'skip' }, { cls: 'alt big' }) : ''}</div>`;
     case 'sell': {
       const mine = g.squad(s, h).filter(pid => s.owner[pid] === 0), xi = new Set(g.lineup(s, h, { withOut: true }).xi);
       return `<div class="card hero"><h2>${p.forced ? 'Servono soldi' : 'Banca'}</h2>
       <h3>${p.forced ? `Ti mancano ${g.money(p.need)}` : 'Vendi alla banca'}</h3>
       <div class="muted">${p.forced ? 'Non puoi pagare: vendi giocatori alla banca a ¾ del loro valore.' : 'Puoi vendere giocatori alla banca a ¾ del valore. Tieni abbastanza uomini per il tuo modulo!'}</div>
-      ${cards(mine.map(pid => cardHTML(P(pid), btn(`Vendi ${g.money(g.nominal(pid) * 3 / 4)}`, { type: 'sell', pid }, { cls: 'small' }), { tags: (xi.has(pid) ? '<span class="tag">titolare</span>' : '') + tagsFor(pid) })))}
+      ${byRole(mine, pid => cardHTML(P(pid), btn(`Vendi ${g.money(g.nominal(pid) * 3 / 4)}`, { type: 'sell', pid }, { cls: 'small' }), { tags: (xi.has(pid) ? '<span class="tag">titolare</span>' : '') + tagsFor(pid) }))}
       ${p.forced ? '' : btn('Fatto', { type: 'done' }, { cls: 'big' })}</div>`;
     }
     case 'auction': {
       const opts = [p.next, p.next + p.step, p.next + 4 * p.step, p.next + 10 * p.step].filter((v, i, a) => v <= p.cap && a.indexOf(v) === i);
       return `<div class="card hero auction"><h2>${p.src === 'bank' ? 'Vendita della banca' : p.half ? 'Asta al 50%' : 'Asta'} · valore ${g.money(g.nominal(p.pid))}</h2>
+      <div class="owner">${p.lander === 0 ? '<b>La tua asta</b>' : `${dot(p.lander)} <b>Asta di ${esc(s.managers[p.lander].name)}</b>`}
+        <span class="muted">${p.src === 'bank' ? (p.lander === 0 ? 'compri dalla banca' : 'vuole comprare dalla banca') : p.lander === 0 ? 'sei finito sulla casella Asta' : 'è finito sulla casella Asta'}${p.half && p.lander !== 0 ? ` · se vince ${esc(s.managers[p.lander].name)} paga metà` : ''}</span></div>
       <div class="solo">${cardHTML(P(p.pid), '', { big: true })}</div>
       <div class="bid">${p.bidder == null ? 'Nessuna offerta' : `${dot(p.bidder)} ${esc(s.managers[p.bidder].name)}: ${g.money(p.high)}`}</div>
       <div class="muted">${p.half && p.lander === 0 ? 'Asta al 50%: se vinci paghi metà. ' : ''}${p.src === 'bank' ? 'Minimo 1½ volte il valore. ' : ''}Hai ${g.money(h.cash)}.</div>
       <div class="btns">${opts.map(v => btn(`Offri ${g.money(v)}`, { type: 'bid', amount: v })).join('')}</div>
+      ${mySquadHTML(p.pid)}
       ${btn(p.bidder == null ? 'Non offro' : 'Lascio', { type: 'pass' }, { cls: 'alt big' })}</div>`;
     }
     case 'results': return `<div class="card hero"><h2>${esc(p.title || 'Risultati')}</h2>${linesHTML(p.lines)}${btn('Avanti', { type: 'ok' }, { cls: 'big' })}</div>`;
@@ -181,15 +247,13 @@ function squadHTML() {
   const m = g.managerOf(s, team);
   if (!m) return picker + `<div class="card"><h3>${club(team, 26)}</h3><p class="muted">Allenatore in bancarotta: la squadra non ha più giocatori.</p></div>`;
   const lu = g.lineup(s, m), all = g.squad(s, m), xiSet = new Set(lu.xi), byPos = pos => lu.slots.filter(x => x.pos === pos).map(x => x.pid == null ? null : P(x.pid));
-  return picker + `<div class="card"><h2>${dot(m.i)} ${esc(m.name)}${m.bankrupt ? ' · in bancarotta' : ''}</h2><h3>${club(team, 26)}</h3>${sums(lu.def, lu.att)}
+  return picker + `<div class="card"><h2>${dot(m.i)} ${esc(m.name)}${m.bankrupt ? ' · in bancarotta' : ''}</h2><h3>${club(team, 26)} <span class="muted">· ${s.pos[team]}° in classifica</span></h3>${sums(lu.def, lu.att)}
   ${lu.full ? '' : `<div class="notice" style="margin-top:10px">Non riesci a schierare un ${m.formation || '4-3-3'} completo: forza 0 e niente incasso!</div>`}
   <div class="rhead">Modulo ${esc(m.formation || '4-3-3')}</div>
-  ${m.human ? `<div class="tactics">${g.FORMATIONS.map(f => { const l = g.lineup(s, m, { f });
-    return btn(`<b>${f}</b><small>${l.full ? `Dif ${l.def} · Att ${l.att}` : 'incompleto'}</small>`, { type: 'formation', f }, { cls: (m.formation || '4-3-3') === f ? 'on' : 'alt' }); }).join('')}</div>` : ''}
+  ${m.human ? tacticsHTML(m) : ''}
   ${pitch([byPos('A'), byPos('M'), byPos('D'), [lu.gk == null ? null : P(lu.gk)]])}
   <div class="muted" style="margin-top:10px">Cassa ${g.money(m.cash)} · Stipendi ${g.money(g.wages(s, m))} · Carte Immunità ${m.immunity}</div></div>
-  <div class="card"><h2>Rosa · ${all.length} giocatori</h2>${cards(all.sort((a, b) => 'GDMAU'.indexOf(P(a).pos) - 'GDMAU'.indexOf(P(b).pos) || P(b).stars - P(a).stars)
-    .map(pid => cardHTML(P(pid), '', { tags: (xiSet.has(pid) ? '<span class="tag">titolare</span>' : '<span class="tag">riserva</span>') + tagsFor(pid) })))}
+  <div class="card"><h2>Rosa · ${all.length} giocatori</h2>${byRole(all, pid => cardHTML(P(pid), '', { tags: (xiSet.has(pid) ? '<span class="tag">titolare</span>' : '<span class="tag">riserva</span>') + tagsFor(pid) }))}
   <p class="muted">Scegli il modulo, i migliori giocatori vengono messi da soli. Più difensori alzano la Difesa, più centrocampisti e attaccanti l'Attacco. I jolly giocano ovunque; un jolly in porta vale 1 stella.</p></div>`;
 }
 
@@ -225,10 +289,10 @@ function marketHTML() {
   return `${s.notice ? `<div class="notice">${esc(s.notice)}</div>` : ''}
   ${can ? '' : '<div class="notice">Puoi fare mercato a inizio turno, prima di tirare il dado.</div>'}${form}
   <div class="card"><h2>Banca</h2><div class="muted">Giocatori venduti alla banca. Prezzo minimo 1½ volte il valore; gli altri allenatori possono rilanciare.</div>
-  ${s.bank.length ? cards(s.bank.map(pid => cardHTML(P(pid), btn(`da ${g.money(Math.ceil(g.nominal(pid) * 1.5 / 5000) * 5000)}`, { type: 'bankBuy', pid }, { cls: 'small', dis: !can })))) : '<p class="muted">La banca non ha giocatori.</p>'}</div>
+  ${s.bank.length ? byRole(s.bank, pid => cardHTML(P(pid), btn(`da ${g.money(Math.ceil(g.nominal(pid) * 1.5 / 5000) * 5000)}`, { type: 'bankBuy', pid }, { cls: 'small', dis: !can }))) : '<p class="muted">La banca non ha giocatori.</p>'}</div>
   <div class="card"><h2>Compra da un allenatore</h2><div class="muted">${closed ? 'Mercato chiuso: si sono giocate le semifinali di coppa.' : 'Vende solo se il prezzo vale più di quanto il giocatore vale per lui.'}</div>
-  ${cpus.map(m => `<div class="rhead">${dot(m.i)} ${esc(m.name)} · ${club(m.club, 18)}</div>` + cards(g.squad(s, m).filter(p => s.owner[p] === m.i).map(pid => cardHTML(P(pid), offerBtn('buy', pid))))).join('')}</div>
-  <div class="card"><h2>Vendi a un allenatore</h2>${cards(g.squad(s, h).filter(p => s.owner[p] === 0).map(pid => cardHTML(P(pid), offerBtn('sell', pid))))}</div>`;
+  ${cpus.map(m => `<div class="rhead">${dot(m.i)} ${esc(m.name)} · ${club(m.club, 18)}</div>` + byRole(g.squad(s, m).filter(p => s.owner[p] === m.i), pid => cardHTML(P(pid), offerBtn('buy', pid)))).join('')}</div>
+  <div class="card"><h2>Vendi a un allenatore</h2>${byRole(g.squad(s, h).filter(p => s.owner[p] === 0), pid => cardHTML(P(pid), offerBtn('sell', pid)))}</div>`;
 }
 
 // ---------- ratings ----------
@@ -250,7 +314,7 @@ function render() {
   const waiting = s.pending && s.pending.type !== 'roll' && tab !== 'play' ? `<div class="notice">C'è una decisione da prendere in “Gioca”.</div>` : '';
   app.innerHTML = `<header><div class="hrow">${crest(h.club, 40)}
     <div class="club"><b>${esc(D.TEAMS[h.club])}</b><small>${esc(h.name)} · Stagione ${s.season}/${s.seasons} · ${s.finished ? 'finita' : esc(g.weekLabel(s))}</small></div></div>
-    <div class="pills"><span class="pill gold">${g.money(h.cash)}</span><span class="pill">${g.gamePoints(s, h)} punti</span><span class="pill">${s.pos[h.club]}° in classifica</span></div></header>
+    <div class="pills"><span class="pill gold">${g.money(h.cash)}</span><span class="pill">${g.gamePoints(s, h)} punti</span><span class="pill">${s.pos[h.club]}° in classifica</span></div>${tab === 'play' ? coachesHTML() : ''}</header>
   <main>${waiting}${body}</main>
   <div class="actbar"></div>
   <nav>${Object.entries(tabs).map(([k, [ic, v]]) => `<button data-tab="${k}" class="${k === tab ? 'on' : ''}"><span>${ic}</span>${v}</button>`).join('')}</nav>`;
@@ -266,7 +330,7 @@ app.addEventListener('click', e => {
   const b = e.target.closest('button');
   if (!b || b.disabled) return;
   if (b.dataset.tab) { tab = b.dataset.tab; confirmNew = false; s.notice = null; offer = null; if (tab === 'squad') squadOf = null; render(); window.scrollTo(0, 0); return; }
-  if (b.dataset.team) { squadOf = +b.dataset.team; render(); return; }
+  if (b.dataset.team) { squadOf = +b.dataset.team; tab = 'squad'; render(); window.scrollTo(0, 0); return; }
   if (b.dataset.offer) { offer = { pid: +b.dataset.pid, buy: b.dataset.offer === 'buy' }; s.notice = null; render(); window.scrollTo(0, 0); return; }
   if (b.id === 'cancelOffer') { offer = null; render(); return; }
   if (b.id === 'sendOffer') {
