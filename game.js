@@ -5,9 +5,9 @@ import * as D from './data.js';
 
 export const rnd = n => Math.floor(Math.random() * n);
 export const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-export const money = n => (n < 0 ? '-£' : '£') + Math.abs(n).toLocaleString('en-GB');
+export const money = n => (n < 0 ? '-€' : '€') + Math.abs(n).toLocaleString('it-IT');
 export const nominal = pid => D.PLAYERS[pid].stars * 20000;
-export const card = pid => { const p = D.PLAYERS[pid]; return `${p.name} ${p.pos}${p.stars}`; };
+export const card = pid => { const p = D.PLAYERS[pid]; return `${p.name} ${D.POS_SHORT[p.pos]}${p.stars}`; };
 const roundUp = (n, step) => Math.ceil(n / step) * step;
 const STEP = 5000;
 const CPU_STAR = 30000;   // what a CPU manager will pay per star of team strength gained
@@ -72,14 +72,14 @@ function best(s, m, pos, except = []) {
 // ---------- money and player movement ----------
 
 function log(s, text, mi = null) { s.log.unshift({ text, mi, t: s.tick = (s.tick || 0) + 1 }); s.log.length = Math.min(s.log.length, 200); }
-const who = (s, m) => m.human ? 'You' : m.name;
+const who = (s, m) => m.name;
 function toPileBottom(s, pid) { endLoan(s, pid); delete s.out[pid]; s.owner[pid] = 'pile'; s.pile.push(pid); }
 function endLoan(s, pid) { s.loans = s.loans.filter(l => l.pid !== pid); }
 function give(s, pid, m) { s.pile = s.pile.filter(p => p !== pid); s.bank = s.bank.filter(p => p !== pid); endLoan(s, pid); s.owner[pid] = m.i; }
 export function sellToBank(s, m, pid, price = nominal(pid) * 3 / 4) {
   endLoan(s, pid); delete s.out[pid];
   s.owner[pid] = 'bank'; s.bank.push(pid); m.cash += price;
-  log(s, `${who(s, m)} sold ${card(pid)} to the bank for ${money(price)}`, m.i);
+  log(s, `${who(s, m)} vende ${card(pid)} alla banca per ${money(price)}`, m.i);
 }
 const sellable = (s, m) => owned(s, m);
 
@@ -87,8 +87,8 @@ function bankrupt(s, m) {
   m.bankrupt = true;
   for (const p of owned(s, m)) toPileBottom(s, p);
   s.loans = s.loans.filter(l => l.to !== m.i && l.from !== m.i);
-  log(s, `${m.human ? 'You are' : m.name + ' is'} bankrupt and resign${m.human ? '' : 's'}!`, m.i);
-  if (m.human) s.queue.splice(1, Infinity, { k: 'over', why: 'You went bankrupt.' });
+  log(s, `${m.name} è in bancarotta e si dimette!`, m.i);
+  if (m.human) s.queue.splice(1, Infinity, { k: 'over', why: 'Sei andato in bancarotta.' });
 }
 
 // ---------- league, cups ----------
@@ -194,13 +194,16 @@ function playWeek(s) {
   }
   if (!s.strengthsSet) { setComputerStrengths(s); drawFA(s); s.strengthsSet = true; }
   const played = new Set(), lines = [];
-  const name = t => D.TEAMS[t] + (managerOf(s, t) ? ` (${who(s, managerOf(s, t))})` : '');
+  // results are data so the screen can draw score cards: h = heading, m = match, n = note
+  const head = text => lines.push({ k: 'h', text }), note = text => lines.push({ k: 'n', text });
+  const match = (h, a, x, y, g = null) => lines.push({ k: 'm', h, a, x, y, g, hd: s.D[h], ha: s.A[h], ad: s.D[a], aa: s.A[a],
+    mh: managerOf(s, h)?.i ?? null, ma: managerOf(s, a)?.i ?? null });
   const pay = (t, amount) => { const m = managerOf(s, t); if (m) { played.add(m.i); if (m.fielded) { m.cash += amount / 2; m.gates += amount / 2; } } };
   const isM = t => !!managerOf(s, t);
 
   if (type === 'L') {
     s.leagueStarted = true;
-    lines.push(`League · round ${round}`);
+    head(`Serie A · giornata ${round}`);
     for (const [h, a] of s.fixtures[round - 1]) {
       const g = gate(s, h, a), gh = leagueGoals(s, h, a), ga = leagueGoals(s, a, h);
       for (const [t, f, x] of [[h, gh, ga], [a, ga, gh]]) {
@@ -208,31 +211,31 @@ function playWeek(s) {
         if (f > x) { r.w++; r.pts += s.points[0]; } else if (f === x) { r.d++; r.pts += s.points[1]; } else { r.l++; r.pts += s.points[2]; }
       }
       pay(h, g); pay(a, g);
-      lines.push(`${name(h)} ${gh}-${ga} ${name(a)}` + (isM(h) || isM(a) ? `  · gate ${money(g)}` : ''));
+      match(h, a, gh, ga, isM(h) || isM(a) ? g : null);
     }
     sortTable(s);
   } else if (type === 'F') {
     if (round === 3) for (const [t, [a, d]] of Object.entries(s.giants)) { s.A[t] = a; s.D[t] = d; }
-    lines.push(`FA Cup · ${D.ROUND_NAMES[round - 1]}`);
+    head(`Coppa Italia · ${D.ROUND_NAMES[round - 1]}`);
     const sl = s.fa.slots, H = sl.length / 2;
     for (let z = 0; z < H; z++) {
       const [h, a] = [sl[z], sl[z + H]], [x, y] = cupScore(s, h, a), win = x > y ? h : a;
       if (isM(h) || isM(a)) {
         const g = gate(s, h, a, D.GATE_BONUS.FA[round - 1]); pay(h, g); pay(a, g);
-        lines.push(`${name(h)} ${x}-${y} ${name(a)}  · gate ${money(g)}`);
+        match(h, a, x, y, g);
         const wm = managerOf(s, win); if (wm) wm.k2 += D.CUP_POINTS.FA[round - 1];
-      } else if (z < 8) lines.push(`${name(h)} ${x}-${y} ${name(a)}`);
+      } else if (z < 8) match(h, a, x, y);
       sl[z] = win;
     }
     s.fa.slots = shuffle(sl.slice(0, H));
-    if (round === 5) { s.fa.winner = s.fa.slots[0]; lines.push(`${D.TEAMS[s.fa.winner]} win the FA Cup!`); }
+    if (round === 5) { s.fa.winner = s.fa.slots[0]; note(`${D.TEAMS[s.fa.winner]} vince la Coppa Italia!`); }
   } else {
     for (const k of ['EC', 'CWC']) {
       const c = s.euro[k]; if (!c.ms.length) continue;
-      lines.push(`${D.COMP_NAME[k]} · ${D.ROUND_NAMES[round - 1]}`);
+      head(`${D.COMP_NAME[k]} · ${D.ROUND_NAMES[round - 1]}`);
       const tie = (h, a, g) => {
         const [x, y] = cupScore(s, h, a); pay(h, g); pay(a, g);
-        lines.push(`${name(h)} ${x}-${y} ${name(a)}  · gate ${money(g)}`);
+        match(h, a, x, y, g);
         const win = x > y ? h : a, lose = win === h ? a : h;
         const wm = managerOf(s, win); if (wm) wm.k3 += D.CUP_POINTS[k][round - 1];
         const lm = managerOf(s, lose); if (lm) c.ms = c.ms.filter(i => i !== lm.i);
@@ -242,16 +245,16 @@ function playWeek(s) {
       if (clubs.length === 2 && c.meet) tie(clubs[0], clubs[1], gate(s, clubs[0], clubs[1], D.GATE_BONUS[k][round - 1]));
       else for (const t of clubs) { const o = nextOpp(c); tie(t, o, gateVsForeign(s, t, o, D.GATE_BONUS[k][round - 1])); }
       c.meet = c.ms.length === 2 && Math.random() * (D.CUP_TEAMS[round - 1] / 2 - 1) <= 1;
-      if (round === 5 && c.ms.length) { c.winner = c.ms[0]; lines.push(`${who(s, s.managers[c.winner])} win the ${D.COMP_NAME[k]}!`); }
+      if (round === 5 && c.ms.length) { c.winner = c.ms[0]; note(`${who(s, s.managers[c.winner])} vince la ${D.COMP_NAME[k]}!`); }
     }
     const u = s.euro.UEFA;
     if (u.ms.length) {
-      lines.push(`UEFA Cup · ${D.ROUND_NAMES[round - 1]}`);
+      head(`Coppa UEFA · ${D.ROUND_NAMES[round - 1]}`);
       const bonus = D.GATE_BONUS.UEFA[round - 1];
       if (round === 1) {
         u.ms.forEach((mi, z) => {
           const t = s.managers[mi].club, o = u.pool[z], [x, y] = cupScore(s, t, o), g = gateVsForeign(s, t, o, bonus);
-          pay(t, g); lines.push(`${name(t)} ${x}-${y} ${name(o)}  · gate ${money(g)}`);
+          pay(t, g); match(t, o, x, y, g);
           if (x > y) u.pool[z] = t;
         });
         u.ms = u.ms.filter(mi => u.pool.includes(s.managers[mi].club));
@@ -261,21 +264,21 @@ function playWeek(s) {
           const [h, a] = [p[z], p[z + H]], [x, y] = cupScore(s, h, a), win = x > y ? h : a;
           if (isM(h) || isM(a)) {
             const g = gate(s, h, a, bonus); pay(h, g); pay(a, g);
-            lines.push(`${name(h)} ${x}-${y} ${name(a)}  · gate ${money(g)}`);
+            match(h, a, x, y, g);
             const wm = managerOf(s, win); if (wm) wm.k3 += D.CUP_POINTS.UEFA[round - 1];
           }
           p[z] = win;
         }
         u.pool = shuffle(p.slice(0, H));
         u.ms = u.ms.filter(mi => u.pool.includes(s.managers[mi].club));
-        if (round === 5 && u.ms.length) { u.winner = u.ms[0]; lines.push(`${who(s, s.managers[u.winner])} win the UEFA Cup!`); }
+        if (round === 5 && u.ms.length) { u.winner = u.ms[0]; note(`${who(s, s.managers[u.winner])} vince la Coppa UEFA!`); }
       }
     }
   }
   if (type !== 'L' && round === 4) s.transfersClosed = true; // semi-final transfer deadline
   for (const m of s.managers) {
     if (!played.has(m.i)) continue;
-    if (!m.fielded && !m.bankrupt) lines.push(`${who(s, m)} could not field a full side: no gate money.`);
+    if (!m.fielded && !m.bankrupt) note(`${who(s, m)} non ha schierato una squadra completa: niente incasso.`);
     for (const p of squad(s, m)) if (s.out[p]) { if (--s.out[p] <= 0) delete s.out[p]; }
     s.loans = s.loans.filter(l => l.to !== m.i);
   }
@@ -306,19 +309,18 @@ function qualifyEurope(s) {
 }
 
 function seasonSummary(s) {
-  const out = [`Season ${s.season} summary`, `League champions: ${D.TEAMS[s.order[0]]}`];
-  if (s.fa?.winner) out.push(`FA Cup: ${D.TEAMS[s.fa.winner]}`);
+  const out = [`Campione d'Italia: ${D.TEAMS[s.order[0]]}`];
+  if (s.fa?.winner) out.push(`Coppa Italia: ${D.TEAMS[s.fa.winner]}`);
   for (const k of ['EC', 'CWC', 'UEFA']) if (s.euro[k].winner != null) out.push(`${D.COMP_NAME[k]}: ${D.TEAMS[s.managers[s.euro[k].winner].club]}`);
-  for (const m of s.managers) out.push(`${who(s, m)} (${D.TEAMS[m.club]}) finished ${ordinal(s.pos[m.club])}${m.bankrupt ? ' · bankrupt' : ''}`);
-  return out;
+  for (const m of s.managers) out.push(`${who(s, m)} (${D.TEAMS[m.club]}) chiude ${s.pos[m.club]}°${m.bankrupt ? ' · in bancarotta' : ''}`);
+  return [{ k: 'h', text: `Riepilogo stagione ${s.season}` }, ...out.map(text => ({ k: 'n', text }))];
 }
-export const ordinal = n => n + (['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || 'th');
 
 // ---------- decks ----------
 
 function draw(s, deck, size) {
   const d = s.decks[deck];
-  if (d.i >= d.order.length) { d.order = shuffle(Array.from({ length: size }, (_, i) => i)); d.i = 0; log(s, `${deck === 'ml' ? "Manager's Luck" : 'Selection Problems'} cards shuffled`); }
+  if (d.i >= d.order.length) { d.order = shuffle(Array.from({ length: size }, (_, i) => i)); d.i = 0; log(s, `Carte ${deck === 'ml' ? 'Fortuna' : 'Problemi di formazione'} rimescolate`); }
   return d.order[d.i++];
 }
 
@@ -344,7 +346,7 @@ const TASKS = {
   },
 
   week(s) {
-    log(s, `— Season ${s.season}, week ${s.week + 1}: ${weekLabel(s)} —`);
+    log(s, `— Stagione ${s.season}, settimana ${s.week + 1}: ${weekLabel(s)} —`);
     after(s, ...active(s).map(m => ({ k: 'turn', m: m.i })), { k: 'play' });
     return true;
   },
@@ -356,7 +358,7 @@ const TASKS = {
     const die = 1 + rnd(6);
     m.sq = (m.sq + die) % D.BOARD.length;
     const sq = D.BOARD[m.sq];
-    log(s, `${who(s, m)} rolled ${die}: ${D.SQUARE[sq].label}`, m.i);
+    log(s, `${who(s, m)} tira ${die}: ${D.SQUARE[sq].label}`, m.i);
     after(s, { k: 'square', m: m.i, sq }, ...(m.human ? [] : [{ k: 'cpuShop', m: m.i }]));
     return true;
   },
@@ -364,14 +366,14 @@ const TASKS = {
   square(s, t) {
     const m = s.managers[t.m];
     switch (t.sq) {
-      case 'WAGES': after(s, { k: 'pay', m: m.i, amount: wages(s, m), why: 'wages' }); break;
+      case 'WAGES': after(s, { k: 'pay', m: m.i, amount: wages(s, m), why: 'di stipendi' }); break;
       case 'ML': after(s, { k: 'ml', m: m.i }); break;
       case 'SP': after(s, { k: 'sp', m: m.i }); break;
       case 'AUC': after(s, { k: 'auction', lander: m.i, half: false, src: 'pile' }); break;
       case 'HALF': after(s, { k: 'auction', lander: m.i, half: true, src: 'pile' }); break;
-      case 'SPON': m.cash += 30000; log(s, `${who(s, m)} received ${money(30000)} sponsorship`, m.i); break;
+      case 'SPON': m.cash += 30000; log(s, `${who(s, m)} incassa ${money(30000)} dallo sponsor`, m.i); break;
       case 'BANK': after(s, { k: 'bankFinance', m: m.i }); break;
-      case 'CRISIS': after(s, { k: 'crisis', m: m.i }, { k: 'pay', m: m.i, amount: 50000, why: 'Crisis fine' }); break;
+      case 'CRISIS': after(s, { k: 'crisis', m: m.i }, { k: 'pay', m: m.i, amount: 50000, why: 'di multa (Crisi)' }); break;
     }
     return true;
   },
@@ -381,7 +383,7 @@ const TASKS = {
     if (m.bankrupt) return true;
     if (t.input?.type === 'sell') sellToBank(s, m, t.input.pid);
     t.input = null;
-    if (m.cash >= t.amount) { m.cash -= t.amount; log(s, `${who(s, m)} paid ${money(t.amount)} ${t.why}`, m.i); return true; }
+    if (m.cash >= t.amount) { m.cash -= t.amount; log(s, `${who(s, m)} paga ${money(t.amount)} ${t.why}`, m.i); return true; }
     const raise = sellable(s, m).reduce((x, p) => x + nominal(p) * 3 / 4, 0);
     if (m.cash + raise < t.amount) { bankrupt(s, m); return true; }
     if (m.human) { s.pending = { type: 'sell', forced: true, need: t.amount - m.cash, why: t.why }; return false; }
@@ -408,8 +410,8 @@ const TASKS = {
     const opts = ['G', 'D', 'M', 'A'].map(pos => best(s, m, pos)).filter(p => p != null);
     if (!opts.length) return true;
     if (m.human && !t.input) {
-      s.pending = { type: 'choose', title: 'Crisis!', text: 'Fined £50,000 and you must sell your best specialist in one section to the bank at ¾ of his value.',
-        options: opts.map(p => ({ id: p, label: `Sell ${card(p)} (${money(nominal(p) * 3 / 4)})` })) };
+      s.pending = { type: 'choose', title: 'Crisi!', text: 'Multa di €50.000 e devi vendere alla banca, a ¾ del valore, il tuo miglior giocatore di un reparto a scelta.',
+        options: opts.map(p => ({ id: p, label: `Vendi ${card(p)} (${money(nominal(p) * 3 / 4)})` })) };
       return false;
     }
     sellToBank(s, m, m.human ? t.input.id : leastHarm(s, m, opts));
@@ -420,11 +422,11 @@ const TASKS = {
     const m = s.managers[t.m];
     t.card ??= draw(s, 'ml', D.LUCK.length);
     const c = D.LUCK[t.card];
-    if (m.human && !t.input) { s.pending = { type: 'info', title: (t.pre ? 'Pre-season · ' : '') + "Manager's Luck", text: c.text }; return false; }
-    if (!m.human) log(s, `${m.name} Manager's Luck: ${c.text}`, m.i);
-    if (c.effect === 'wages') after(s, { k: 'pay', m: m.i, amount: wages(s, m), why: 'players bonus' });
-    else if (c.effect === 'ground') after(s, { k: 'groundSale', m: m.i }, { k: 'pay', m: m.i, amount: 300000, why: 'ground purchase' });
-    else if (c.effect > 0) { m.cash += c.effect; if (m.human) log(s, `You received ${money(c.effect)}`, m.i); }
+    if (m.human && !t.input) { s.pending = { type: 'info', title: (t.pre ? 'Precampionato · ' : '') + 'Fortuna', text: c.text }; return false; }
+    if (!m.human) log(s, `${m.name} · Fortuna: ${c.text}`, m.i);
+    if (c.effect === 'wages') after(s, { k: 'pay', m: m.i, amount: wages(s, m), why: 'di premio ai giocatori' });
+    else if (c.effect === 'ground') after(s, { k: 'groundSale', m: m.i }, { k: 'pay', m: m.i, amount: 300000, why: "per l'acquisto dello stadio" });
+    else if (c.effect > 0) { m.cash += c.effect; if (m.human) log(s, `${m.name} incassa ${money(c.effect)}`, m.i); }
     else after(s, { k: 'pay', m: m.i, amount: -c.effect, why: '' });
     return true;
   },
@@ -433,7 +435,7 @@ const TASKS = {
     const m = s.managers[t.m], ps = owned(s, m);
     if (!ps.length) return true;
     if (m.human && !t.input) {
-      s.pending = { type: 'pick', title: 'Ground purchase', text: 'You may sell one player to the bank at 1.5 times his nominal value.',
+      s.pending = { type: 'pick', title: 'Acquisto dello stadio', text: 'Puoi vendere un giocatore alla banca a 1,5 volte il suo valore nominale.',
         pids: ps, prices: Object.fromEntries(ps.map(p => [p, nominal(p) * 1.5])), optional: true };
       return false;
     }
@@ -449,26 +451,26 @@ const TASKS = {
     const harmful = !['free', 'half', 'immunity', 'buyOpp'].includes(c.effect);
     if (m.human && !t.input) {
       s.pending = harmful && m.immunity
-        ? { type: 'choose', title: (t.pre ? 'Pre-season · ' : '') + 'Selection Problems', text: c.text, options: [{ id: 'use', label: 'Play my Immunity card' }, { id: 'accept', label: 'Accept it' }] }
-        : { type: 'info', title: (t.pre ? 'Pre-season · ' : '') + 'Selection Problems', text: c.text };
+        ? { type: 'choose', title: (t.pre ? 'Precampionato · ' : '') + 'Problemi di formazione', text: c.text, options: [{ id: 'use', label: 'Gioca la carta Immunità' }, { id: 'accept', label: 'Accetta' }] }
+        : { type: 'info', title: (t.pre ? 'Precampionato · ' : '') + 'Problemi di formazione', text: c.text };
       return false;
     }
-    if (!m.human) log(s, `${m.name} Selection Problem: ${c.text}`, m.i);
+    if (!m.human) log(s, `${m.name} · Problema di formazione: ${c.text}`, m.i);
     if (harmful && m.immunity && (m.human ? t.input.id === 'use' : true)) {
-      m.immunity--; s.immunityBank++; log(s, `${who(s, m)} played an Immunity card`, m.i); return true;
+      m.immunity--; s.immunityBank++; log(s, `${who(s, m)} gioca una carta Immunità`, m.i); return true;
     }
-    const lose = pid => { if (pid != null) { log(s, `${who(s, m)} lost ${card(pid)}`, m.i); toPileBottom(s, pid); } };
+    const lose = pid => { if (pid != null) { log(s, `${who(s, m)} perde ${card(pid)}`, m.i); toPileBottom(s, pid); } };
     switch (c.effect) {
-      case 'free': { const p = s.pile.shift(); if (p != null) { give(s, p, m); log(s, `${who(s, m)} got ${card(p)} on a free transfer`, m.i); } break; }
-      case 'abroad': { const p = best(s, m); if (p != null) { m.cash += nominal(p) * 2; log(s, `${who(s, m)} sold ${card(p)} abroad for ${money(nominal(p) * 2)}`, m.i); toPileBottom(s, p); } break; }
-      case 'out': { const p = best(s, m, c.pos); if (p != null) { s.out[p] = 1; log(s, `${card(p)} is out for one game`, m.i); } break; }
+      case 'free': { const p = s.pile.shift(); if (p != null) { give(s, p, m); log(s, `${who(s, m)} prende ${card(p)} a parametro zero`, m.i); } break; }
+      case 'abroad': { const p = best(s, m); if (p != null) { m.cash += nominal(p) * 2; log(s, `${who(s, m)} vende ${card(p)} all'estero per ${money(nominal(p) * 2)}`, m.i); toPileBottom(s, p); } break; }
+      case 'out': { const p = best(s, m, c.pos); if (p != null) { s.out[p] = 1; log(s, `${card(p)} salta una partita`, m.i); } break; }
       case 'lose': lose(best(s, m, c.pos)); break;
       case 'crash': { const a = best(s, m); lose(a); lose(best(s, m)); break; }
       case 'retire': after(s, { k: 'retire', m: m.i, pos: c.pos }); break;
       case 'half': after(s, { k: 'auction', lander: m.i, half: true, src: 'pile' }); break;
       case 'immunity':
-        if (s.immunityBank > 0) { s.immunityBank--; m.immunity++; log(s, `${who(s, m)} got an Immunity card`, m.i); }
-        else log(s, 'The bank has no Immunity cards left', m.i);
+        if (s.immunityBank > 0) { s.immunityBank--; m.immunity++; log(s, `${who(s, m)} ottiene una carta Immunità`, m.i); }
+        else log(s, 'La banca non ha più carte Immunità', m.i);
         break;
       case 'loan': { const p = best(s, m, c.pos); if (p != null) after(s, { k: 'loan', from: m.i, pid: p }); break; }
       case 'buyOpp': after(s, { k: 'buyOpp', m: m.i }); break;
@@ -480,23 +482,23 @@ const TASKS = {
     const m = s.managers[t.m], ps = owned(s, m).filter(p => D.PLAYERS[p].pos === t.pos);
     if (!ps.length) return true;
     if (m.human && ps.length > 1 && !t.input) {
-      s.pending = { type: 'pick', title: 'Who leaves?', text: `Choose the ${D.POS_NAME[t.pos].toLowerCase()} who leaves your club.`, pids: ps };
+      s.pending = { type: 'pick', title: 'Chi se ne va?', text: `Scegli il ${D.POS_NAME[t.pos].toLowerCase()} che lascia la squadra.`, pids: ps };
       return false;
     }
     const p = m.human ? (t.input?.pid ?? ps[0]) : leastHarm(s, m, ps);
-    log(s, `${card(p)} left ${who(s, m) === 'You' ? 'your club' : m.name}`, m.i);
+    log(s, `${card(p)} lascia ${m.human ? 'la tua squadra' : m.name}`, m.i);
     toPileBottom(s, p);
     return true;
   },
 
   loan(s, t) {
     const from = s.managers[t.from], price = nominal(t.pid) / 4;
-    if (s.transfersClosed || !playsThisWeek(s, from)) { log(s, `No loan possible for ${card(t.pid)} this week`, from.i); return true; }
+    if (s.transfersClosed || !playsThisWeek(s, from)) { log(s, `Nessun prestito possibile per ${card(t.pid)} questa settimana`, from.i); return true; }
     const takers = active(s).filter(m => m !== from && playsThisWeek(s, m) && m.cash >= price);
     const h = human(s);
     if (takers.includes(h) && !t.input) {
-      s.pending = { type: 'choose', title: 'Loan offer', text: `${from.name} must offer ${card(t.pid)} on loan for one game. Price ${money(price)}.`,
-        options: [{ id: 'yes', label: `Borrow him for ${money(price)}` }, { id: 'no', label: 'No thanks' }] };
+      s.pending = { type: 'choose', title: 'Offerta di prestito', text: `${from.name} deve offrire ${card(t.pid)} in prestito per una partita. Prezzo ${money(price)}.`,
+        options: [{ id: 'yes', label: `Prendilo per ${money(price)}` }, { id: 'no', label: 'No, grazie' }] };
       return false;
     }
     let to = t.input?.id === 'yes' ? h : null;
@@ -504,21 +506,21 @@ const TASKS = {
       const cpus = takers.filter(m => !m.human && strength(s, m, { add: t.pid }) > strength(s, m) && m.cash - price >= CPU_BUFFER);
       to = cpus.sort((a, b) => strength(s, b, { add: t.pid }) - strength(s, a, { add: t.pid }))[0];
     }
-    if (!to) { log(s, `Nobody took ${card(t.pid)} on loan`, from.i); return true; }
+    if (!to) { log(s, `Nessuno prende ${card(t.pid)} in prestito`, from.i); return true; }
     to.cash -= price; from.cash += price;
     s.loans.push({ pid: t.pid, from: from.i, to: to.i });
-    log(s, `${who(s, to)} borrowed ${card(t.pid)} from ${who(s, from)} for ${money(price)}`, to.i);
+    log(s, `${who(s, to)} prende in prestito ${card(t.pid)} da ${who(s, from)} per ${money(price)}`, to.i);
     return true;
   },
 
   buyOpp(s, t) {
     const m = s.managers[t.m];
-    if (s.transfersClosed) { log(s, 'Transfer deadline has passed: no effect', m.i); return true; }
+    if (s.transfersClosed) { log(s, 'Il mercato è chiuso: nessun effetto', m.i); return true; }
     const cands = active(s).filter(o => o !== m).flatMap(o => owned(s, o)).filter(p => nominal(p) <= m.cash);
     if (!cands.length) return true;
     let pid = null;
     if (m.human) {
-      if (!t.input) { s.pending = { type: 'pick', title: 'Buy an opponent', text: "Buy one of your opponents' players for his nominal value.", pids: cands, prices: Object.fromEntries(cands.map(p => [p, nominal(p)])), optional: true }; return false; }
+      if (!t.input) { s.pending = { type: 'pick', title: 'Compra da un avversario', text: 'Compra un giocatore di un avversario al suo valore nominale.', pids: cands, prices: Object.fromEntries(cands.map(p => [p, nominal(p)])), optional: true }; return false; }
       pid = t.input.pid ?? null;
     } else {
       const gain = p => strength(s, m, { add: p }) - strength(s, m);
@@ -528,7 +530,7 @@ const TASKS = {
     if (pid == null) return true;
     const seller = s.managers[s.owner[pid]];
     m.cash -= nominal(pid); seller.cash += nominal(pid); give(s, pid, m);
-    log(s, `${who(s, m)} bought ${card(pid)} from ${who(s, seller)} for ${money(nominal(pid))}`, m.i);
+    log(s, `${who(s, m)} compra ${card(pid)} da ${who(s, seller)} per ${money(nominal(pid))}`, m.i);
     return true;
   },
 
@@ -537,7 +539,7 @@ const TASKS = {
     if (!t.ready) {
       t.ready = true;
       t.pid = t.src === 'pile' ? s.pile.shift() : (s.bank.includes(t.bankPid) ? t.bankPid : null);
-      if (t.pid == null) { if (t.src === 'pile') log(s, 'The Auction Pile is empty'); return true; }
+      if (t.pid == null) { if (t.src === 'pile') log(s, 'Il mazzo dell\'asta è vuoto'); return true; }
       if (t.src === 'pile') s.owner[t.pid] = 'auction';
       t.step = t.half ? 10000 : STEP;
       t.min = t.src === 'bank' ? roundUp(nominal(t.pid) * 1.5, t.step) : t.step;
@@ -548,7 +550,7 @@ const TASKS = {
       t.cpu = maxes[0] ?? null;
       t.high = 0; t.bidder = null;
       if (t.cpu) { t.high = Math.max(t.min, Math.min(t.cpu.max, maxes[1] ? maxes[1].max + t.step : t.min)); t.bidder = t.cpu.i; }
-      log(s, `${t.src === 'bank' ? 'Bank sale' : (t.half ? '50% auction' : 'Auction')}: ${card(t.pid)} (nominal ${money(nominal(t.pid))})`, t.lander);
+      log(s, `${t.src === 'bank' ? 'Vendita della banca' : (t.half ? 'Asta al 50%' : 'Asta')}: ${card(t.pid)} (valore ${money(nominal(t.pid))})`, t.lander);
     }
     const h = human(s);
     if (t.input?.type === 'bid') {
@@ -565,12 +567,12 @@ const TASKS = {
     }
     if (t.bidder == null) {
       if (t.src === 'pile') { s.pile.push(t.pid); s.owner[t.pid] = 'pile'; }
-      log(s, `No bids: ${card(t.pid)} ${t.src === 'pile' ? 'goes to the bottom of the pile' : 'stays with the bank'}`);
+      log(s, `Nessuna offerta: ${card(t.pid)} ${t.src === 'pile' ? 'torna in fondo al mazzo' : 'resta alla banca'}`);
       return true;
     }
     const w = s.managers[t.bidder], price = t.half && t.bidder === t.lander ? t.high / 2 : t.high;
     w.cash -= price; give(s, t.pid, w);
-    log(s, `${who(s, w)} bought ${card(t.pid)} for ${money(price)}`, w.i);
+    log(s, `${who(s, w)} compra ${card(t.pid)} per ${money(price)}`, w.i);
     return true;
   },
 
@@ -598,10 +600,10 @@ const TASKS = {
       for (const m of active(s)) m.k1 += leaguePoints(s.pos[m.club]);
       s.leagueStarted = false;
     }
-    if (!t.input) { s.pending = { type: 'results', title: `End of season ${s.season}`, lines: t.lines }; return false; }
+    if (!t.input) { s.pending = { type: 'results', title: `Fine della stagione ${s.season}`, lines: t.lines }; return false; }
     if (s.season >= s.seasons) {
       for (const m of active(s)) m.k7 = Math.floor(m.cash / 50000);
-      after(s, { k: 'over', why: 'The game is over.' });
+      after(s, { k: 'over', why: 'La partita è finita.' });
       return true;
     }
     qualifyEurope(s);
@@ -615,18 +617,18 @@ const TASKS = {
 
 export function weekLabel(s) {
   const [type, r] = D.CALENDAR[s.week];
-  return type === 'L' ? `League round ${r}` : `${type === 'F' ? 'FA Cup' : 'European'} ${D.ROUND_NAMES[r - 1]}`;
+  return type === 'L' ? `Serie A, giornata ${r}` : `${type === 'F' ? 'Coppa Italia' : 'Coppe europee'}, ${D.ROUND_NAMES[r - 1].toLowerCase()}`;
 }
 
 // ---------- public API ----------
 
-export function newGame({ name = 'You', club = 1, level = 2, seasons = 2, cpus = 1, points = [3, 1, 0] } = {}) {
-  const s = { v: 1, level, seasons, points, season: 1, week: 0, managers: [], owner: {}, pile: [], bank: [], out: {}, loans: [],
+export function newGame({ name = 'Mister', club = 1, level = 2, seasons = 2, cpus = 1, points = [3, 1, 0] } = {}) {
+  const s = { v: 2, level, seasons, points, season: 1, week: 0, managers: [], owner: {}, pile: [], bank: [], out: {}, loans: [],
     immunityBank: 6, A: Array(81).fill(0), D: Array(81).fill(0), pos: {}, euro: { EC: { ms: [] }, CWC: { ms: [] }, UEFA: { ms: [] } },
     decks: { ml: { order: [], i: 0 }, sp: { order: [], i: 0 } }, queue: [], pending: null, log: [] };
   for (let t = 1; t <= 10; t++) s.pos[t] = t;
   const clubs = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].filter(c => c !== club));
-  const cpuNames = shuffle(['Big Ron', 'Cloughie', 'El Tel', 'Fergie', 'King Kenny', 'Howard', 'Bobby']);
+  const cpuNames = shuffle(['Trap', 'Capello', 'Sacchi', 'Lippi', 'Ancelotti', 'Mancio', 'Conte', 'Spalletti']);
   for (let i = 0; i <= cpus; i++) {
     s.managers.push({ i, name: i ? cpuNames[i - 1] : name, human: !i, club: i ? clubs[i - 1] : club, cash: 200000, sq: 0,
       immunity: 0, bankrupt: false, k1: 0, k2: 0, k3: 0, k7: 0, gates: 0 });
@@ -649,7 +651,7 @@ export function newGame({ name = 'You', club = 1, level = 2, seasons = 2, cpus =
   s.pile = shuffle([...free]);
   for (const p of s.pile) s.owner[p] = 'pile';
   startSeason(s);
-  log(s, `Welcome, ${name}! You manage ${D.TEAMS[club]}. Season 1 kicks off.`);
+  log(s, `Benvenuto, ${name}! Alleni ${D.TEAMS[club]}. Si parte con la stagione 1.`);
   s.queue = [{ k: 'season' }];
   return advance(s);
 }
@@ -698,22 +700,22 @@ export function act(s, input) {
 // Transfer offers to CPU managers, allowed before the cup semi-final deadline. Result message in s.notice.
 function trade(s, { type, pid, price, to }) {
   const h = human(s);
-  if (s.transfersClosed) { s.notice = 'Transfer deadline has passed (cup semi-finals played).'; return s; }
+  if (s.transfersClosed) { s.notice = 'Il mercato è chiuso (giocate le semifinali di coppa).'; return s; }
   price = Math.floor(+price / STEP) * STEP;
   if (type === 'buyOffer') {
     const o = s.managers[s.owner[pid]];
-    if (!o || o.human || o.bankrupt || loanOf(s, pid) || !(price > 0) || price > h.cash) { s.notice = 'Offer not possible.'; return s; }
+    if (!o || o.human || o.bankrupt || loanOf(s, pid) || !(price > 0) || price > h.cash) { s.notice = 'Offerta non possibile.'; return s; }
     const loss = strength(s, o) - strength(s, o, { remove: pid });
     const ask = Math.max(nominal(pid) * 1.5, nominal(pid) + loss * CPU_STAR * 1.3);
-    if (price < ask || !lineup(s, o, { remove: pid, withOut: true }).full) { s.notice = `${o.name} rejects your ${money(price)} offer for ${card(pid)}.`; return s; }
+    if (price < ask || !lineup(s, o, { remove: pid, withOut: true }).full) { s.notice = `${o.name} rifiuta i tuoi ${money(price)} per ${card(pid)}.`; return s; }
     h.cash -= price; o.cash += price; give(s, pid, h);
-    s.notice = `${o.name} accepts! ${card(pid)} joins you for ${money(price)}.`;
+    s.notice = `${o.name} accetta! ${card(pid)} arriva per ${money(price)}.`;
   } else {
     const o = s.managers[to];
-    if (s.owner[pid] !== h.i || loanOf(s, pid) || !o || o.human || o.bankrupt || !(price > 0)) { s.notice = 'Offer not possible.'; return s; }
-    if (price > cpuMax(s, o, pid)) { s.notice = `${o.name} is not interested at ${money(price)}.`; return s; }
+    if (s.owner[pid] !== h.i || loanOf(s, pid) || !o || o.human || o.bankrupt || !(price > 0)) { s.notice = 'Offerta non possibile.'; return s; }
+    if (price > cpuMax(s, o, pid)) { s.notice = `${o.name} non è interessato a ${money(price)}.`; return s; }
     o.cash -= price; h.cash += price; give(s, pid, o);
-    s.notice = `${o.name} buys ${card(pid)} for ${money(price)}.`;
+    s.notice = `${o.name} compra ${card(pid)} per ${money(price)}.`;
   }
   log(s, s.notice, h.i);
   return s;
