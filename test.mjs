@@ -40,7 +40,7 @@ function check(s) {
 
 let finished = 0, steps = 0;
 for (let game = 0; game < 40; game++) {
-  let s = g.newGame({ name: 'T', club: 1 + g.rnd(10), level: 1 + g.rnd(4), seasons: 1 + g.rnd(3), cpus: 1 + g.rnd(4) });
+  let s = g.newGame({ name: 'T', club: 1 + g.rnd(10), level: 1 + g.rnd(4), seasons: 1 + g.rnd(3) });
   for (let i = 0; i < 20000 && !s.finished; i++) {
     s = JSON.parse(JSON.stringify(s)); // must survive a save/load at any point
     const before = s.queue.length + JSON.stringify(s.pending).length;
@@ -55,3 +55,7 @@ for (let game = 0; game < 40; game++) {
 const s = g.newGame({});
 console.log(`ok: ${finished} games, ${steps} steps; points by position:`, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(g.leaguePoints).join(' '));
 assert.deepEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(g.leaguePoints), [15, 12, 10, 8, 6, 5, 4, 3, 2, 1]);
+// every Serie A club has a coach and a full starting squad
+{ const s = g.newGame({ club: 3 });
+  assert.deepEqual(s.managers.map(m => m.club).sort((a, b) => a - b), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  for (const m of s.managers) assert.equal(g.squad(s, m).length, 13); }

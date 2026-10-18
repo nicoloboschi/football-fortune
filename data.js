@@ -64,9 +64,8 @@ export const TEAMS = [null, 'Juventus', 'Inter', 'Milan', 'Napoli', 'Roma', 'Laz
   'Rangers', 'Young Boys', 'Slavia Praga', 'Ferencváros', 'Malmö', 'Marsiglia', 'Monaco', 'Real Madrid',
   'Barcellona', 'Bayern Monaco', 'Manchester City', 'Liverpool', 'PSG', 'Chelsea', 'Manchester United',
   'Atlético Madrid', 'Arsenal'];
-// Starting XI shown for Serie A clubs run by the computer (not cards: they never trade).
-// Order: keeper, 4 defenders, 3 midfielders, 3 attackers, best first in each line.
-// Their stars are dealt each season so that they add up to the club's Defence and Attack.
+// Real players of each Serie A club, added to the pack as extra cards (stars are my judgement).
+// Order: keeper, 4 defenders, 3 midfielders, 3 attackers; XI_STARS lines up with the names.
 export const CLUB_XI = [null,
   ['Neto', 'Danilo', 'Alex Sandro', 'Martín Cáceres', 'Zdeněk Grygera', 'Mauro Camoranesi', 'Sami Khedira', 'Adrien Rabiot', 'Mario Mandžukić', 'Álvaro Morata', 'Fernando Llorente'],
   ['Francesco Toldo', 'Iván Córdoba', 'Stefan de Vrij', 'Cristian Chivu', 'Denzel Dumfries', 'Patrick Vieira', 'Thiago Motta', 'Henrikh Mkhitaryan', 'Adriano', 'Marcus Thuram', 'Rodrigo Palacio'],
@@ -78,6 +77,16 @@ export const CLUB_XI = [null,
   ['Sébastien Frey', 'Nikola Milenković', 'Dario Dainelli', 'Per Krøldrup', 'Manuel Pasqual', 'Borja Valero', 'Matías Vecino', 'Marco Benassi', 'Dušan Vlahović', 'Adrian Mutu', 'Giuseppe Rossi'],
   ['Łukasz Skorupski', 'Riccardo Calafiori', 'Sam Beukema', 'Lorenzo De Silvestri', 'Adama Soumaoro', 'Lewis Ferguson', 'Gary Medel', 'Diego Pérez', 'Joshua Zirkzee', 'Marco Di Vaio', 'Riccardo Orsolini'],
   ['Vanja Milinković-Savić', 'Kamil Glik', 'Angelo Ogbonna', 'Nicolas Nkoulou', 'Cristian Molinaro', 'Daniele Baselli', 'Tomás Rincón', 'Saša Lukić', 'Andrea Belotti', 'Alessio Cerci', 'Fabio Quagliarella']];
+
+export const XI_STARS = [null, '22322333332', '33332433432', '23222323333', '23222322332', '33332332443',
+  '22222332332', '12222322333', '32212321333', '23221221332', '22221221323'];
+const XI_SKIN = { Adriano: 5, 'Marcus Thuram': 5, 'Denzel Dumfries': 5, 'Patrick Vieira': 6, 'Kevin-Prince Boateng': 5,
+  'Ismaël Bennacer': 3, Robinho: 4, 'Alexandre Pato': 3, Juan: 4, 'Mohamed Salah': 4, 'Felipe Anderson': 4, 'Ademola Lookman': 6,
+  'Duván Zapata': 5, 'Adama Soumaoro': 6, 'Nicolas Nkoulou': 6, 'Faouzi Ghoulam': 4, Danilo: 4, 'Alex Sandro': 4,
+  'Thiago Motta': 3, 'Tomás Rincón': 4, 'Gary Medel': 3, 'Angelo Ogbonna': 5, 'Joshua Zirkzee': 4, 'Rafael Tolói': 3, 'Neto': 3 };
+const h = str => [...str].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+for (let club = 1; club <= 10; club++) CLUB_XI[club].forEach((name, k) => PLAYERS.push({ id: PLAYERS.length, pos: 'GDDDDMMMAAA'[k],
+  stars: +XI_STARS[club][k], name, club, look: `${XI_SKIN[name] || 2}${'sshlbc'[h(name) % 6]}${'kkbby'[h(name + 'h') % 5]}${h(name + 'b') % 3}` }));
 
 // Kit colours per club, used for badges and shirts: [main, second, pattern]
 // pattern: s stripes, h halves, p plain, b chest band, o hoops, v centre stripe

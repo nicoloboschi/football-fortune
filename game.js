@@ -622,29 +622,31 @@ export function weekLabel(s) {
 
 // ---------- public API ----------
 
-export function newGame({ name = 'Mister', club = 1, level = 2, seasons = 2, cpus = 1, points = [3, 1, 0] } = {}) {
+// Every other Serie A club has a computer coach, so all 10 clubs are managed.
+export function newGame({ name = 'Mister', club = 1, level = 2, seasons = 2, points = [3, 1, 0] } = {}) {
   const s = { v: 2, level, seasons, points, season: 1, week: 0, managers: [], owner: {}, pile: [], bank: [], out: {}, loans: [],
     immunityBank: 6, A: Array(81).fill(0), D: Array(81).fill(0), pos: {}, euro: { EC: { ms: [] }, CWC: { ms: [] }, UEFA: { ms: [] } },
     decks: { ml: { order: [], i: 0 }, sp: { order: [], i: 0 } }, queue: [], pending: null, log: [] };
   for (let t = 1; t <= 10; t++) s.pos[t] = t;
   const clubs = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].filter(c => c !== club));
-  const cpuNames = shuffle(['Trap', 'Capello', 'Sacchi', 'Lippi', 'Ancelotti', 'Mancio', 'Conte', 'Spalletti']);
-  for (let i = 0; i <= cpus; i++) {
+  const cpuNames = shuffle(['Trap', 'Capello', 'Sacchi', 'Lippi', 'Ancelotti', 'Mancio', 'Conte', 'Spalletti', 'Allegri']);
+  for (let i = 0; i < 10; i++) {
     s.managers.push({ i, name: i ? cpuNames[i - 1] : name, human: !i, club: i ? clubs[i - 1] : club, cash: 200000, sq: 0,
       immunity: 0, bankrupt: false, k1: 0, k2: 0, k3: 0, k7: 0, gates: 0 });
   }
-  // starting squads: random rows from one half of the program's squad table
-  const half = rnd(2) * 5, gd = shuffle([0, 1, 2, 3, 4]), ma = shuffle([0, 1, 2, 3, 4]), u = shuffle([0, 1, 2, 3, 4]);
+  // starting squads: the program's squad table has 10 rows, one each; columns are shuffled between managers
+  const ten = () => shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), gd = ten(), ma = ten(), u = ten();
   const free = new Set(D.PLAYERS.map(p => p.id));
   const take = (pos, stars, m) => {
     const ok = [...free].filter(p => D.PLAYERS[p].pos === pos);
-    const dist = p => Math.abs(D.PLAYERS[p].stars - stars);
+    // a club's own players come first, unless that means being 2+ stars off the table
+    const dist = p => Math.abs(D.PLAYERS[p].stars - stars) + (D.PLAYERS[p].club === m.club ? 0 : 1.5);
     const bestDist = Math.min(...ok.map(dist));
     const p = shuffle(ok.filter(p => dist(p) === bestDist))[0];
     free.delete(p); s.owner[p] = m.i;
   };
   for (const m of s.managers) {
-    const row = k => D.SQUAD_ROWS[half + [gd, gd, ma, ma, u][k][m.i]][k];
+    const row = k => D.SQUAD_ROWS[[gd, gd, ma, ma, u][k][m.i]][k];
     take('G', row(0), m);
     [...'DMAU'].forEach((pos, k) => [...String(row(k + 1))].forEach(st => take(pos, +st, m)));
   }
@@ -721,20 +723,3 @@ function trade(s, { type, pid, price, to }) {
   return s;
 }
 
-// Real XI for a computer-run Serie A club. Stars are dealt so lines add up to the club's Defence and Attack.
-const XI_SKIN = { Adriano: 5, 'Marcus Thuram': 5, 'Denzel Dumfries': 5, 'Patrick Vieira': 6, 'Kevin-Prince Boateng': 5,
-  'Ismaël Bennacer': 3, Robinho: 4, 'Alexandre Pato': 3, Juan: 4, 'Mohamed Salah': 4, 'Felipe Anderson': 4, 'Ademola Lookman': 6,
-  'Duván Zapata': 5, 'Adama Soumaoro': 6, 'Nicolas Nkoulou': 6, 'Faouzi Ghoulam': 4, Danilo: 4, 'Alex Sandro': 4,
-  'Thiago Motta': 3, 'Tomás Rincón': 4, 'Gary Medel': 3, 'Angelo Ogbonna': 5, 'Joshua Zirkzee': 4, 'Rafael Tolói': 3, 'Neto': 3 };
-export function clubXI(s, team) {
-  if (!s.strengthsSet || team > 10) return null;
-  const deal = (total, n) => Array.from({ length: n }, (_, i) => Math.max(1, Math.min(5, Math.floor(total / n) + (i < total % n ? 1 : 0))));
-  const names = D.CLUB_XI[team], def = deal(s.D[team], 5), att = deal(s.A[team], 6);
-  const pos = ['G', 'D', 'D', 'D', 'D', 'M', 'M', 'M', 'A', 'A', 'A'];
-  const attOrder = [8, 5, 9, 6, 10, 7]; // best attacker, best midfielder, ...
-  const stars = [...def, ...Array(6)];
-  attOrder.forEach((idx, k) => { stars[idx] = att[k]; });
-  const h = str => [...str].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
-  return names.map((name, i) => ({ name, pos: pos[i], stars: stars[i], club: team,
-    look: `${XI_SKIN[name] || 2}${'sshlbc'[h(name) % 6]}${'kkbby'[h(name + 'h') % 5]}${h(name + 'b') % 3}` }));
-}

@@ -2,7 +2,7 @@ import * as g from './game.js';
 import * as D from './data.js';
 import { crest, avatar } from './art.js';
 
-const COLORS = ['#f2c230', '#e4002b', '#00a3e0', '#ff7a00', '#8a2be2'];
+const COLORS = ['#f2c230', '#e4002b', '#00a3e0', '#ff7a00', '#8a2be2', '#2bb673', '#ff5fa2', '#8b5a2b', '#9aa0a6', '#00c2c7'];
 const app = document.getElementById('app');
 let s = null, tab = 'play', lastDie = null, squadOf = null, offer = null, confirmNew = false;
 
@@ -51,8 +51,7 @@ function setup() {
     <p class="muted">Alleni un club di Serie A contro allenatori del computer. Giri il tabellone, compri campioni all'asta, affronti Fortuna e Problemi di formazione, poi giochi campionato, Coppa Italia e coppe europee. Vince chi ha più punti alla fine.</p>
     <label>Il tuo nome</label><input id="name" value="Nicolò" maxlength="14">
     <label>La tua squadra</label><div class="clubpick">${D.TEAMS.slice(1, 11).map((t, i) => `<button class="alt small${i ? '' : ' on'}" data-club="${i + 1}">${crest(i + 1, 24)}<span>${t}</span></button>`).join('')}</div>
-    <label>Allenatori avversari</label><select id="cpus"><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
-    <label>Difficoltà (forza delle squadre del computer)</label><select id="level"><option value="1">1 · Facile</option><option value="2" selected>2 · Media</option><option value="3">3 · Difficile</option><option value="4">4 · Esperto</option></select>
+    <label>Difficoltà (forza delle avversarie in coppa)</label><select id="level"><option value="1">1 · Facile</option><option value="2" selected>2 · Media</option><option value="3">3 · Difficile</option><option value="4">4 · Esperto</option></select>
     <label>Stagioni</label><select id="seasons"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option></select>
     <button class="big" id="start">Fischio d'inizio</button>
   </div></main>`;
@@ -62,7 +61,7 @@ function setup() {
   });
   document.getElementById('start').onclick = () => {
     const v = id => document.getElementById(id).value;
-    s = g.newGame({ name: v('name') || 'Mister', club: pickedClub, cpus: +v('cpus'), level: +v('level'), seasons: +v('seasons') });
+    s = g.newGame({ name: v('name') || 'Mister', club: pickedClub, level: +v('level'), seasons: +v('seasons') });
     tab = 'play'; squadOf = null; save(); render();
   };
 }
@@ -148,14 +147,7 @@ function squadHTML() {
     return `<button class="small clubbtn${t === team ? '' : ' alt'}" data-team="${t}">${crest(t, 20)}${m ? dot(m.i) : ''}</button>`;
   }).join('')}</div>`;
   const m = g.managerOf(s, team);
-  if (!m) {
-    const xi = g.clubXI(s, team);
-    if (!xi) return picker + `<div class="card"><h3>${club(team, 26)}</h3><p class="muted">Squadra del computer. La formazione si vede dopo la prima giornata della stagione.</p></div>`;
-    return picker + `<div class="card"><h2>Squadra del computer · ${s.pos[team]}° in classifica</h2><h3>${club(team, 26)}</h3>${sums(s.D[team], s.A[team])}
-      ${pitch([xi.slice(8, 11), xi.slice(5, 8), xi.slice(1, 5), [xi[0]]])}
-      <p class="muted">Le squadre del computer non vanno sul mercato: la loro forza cambia a ogni stagione.</p></div>
-      <div class="card"><h2>Formazione</h2>${cards(xi.map(p => cardHTML(p)))}</div>`;
-  }
+  if (!m) return picker + `<div class="card"><h3>${club(team, 26)}</h3><p class="muted">Allenatore in bancarotta: la squadra non ha più giocatori.</p></div>`;
   const lu = g.lineup(s, m), all = g.squad(s, m), xiSet = new Set(lu.xi), byPos = pos => lu.slots.filter(x => x.pos === pos).map(x => x.pid == null ? null : P(x.pid));
   return picker + `<div class="card"><h2>${dot(m.i)} ${esc(m.name)}${m.bankrupt ? ' · in bancarotta' : ''}</h2><h3>${club(team, 26)}</h3>${sums(lu.def, lu.att)}
   ${lu.full ? '' : '<div class="notice" style="margin-top:10px">Non riesci a schierare un 4-3-3 completo: forza 0 e niente incasso!</div>'}
