@@ -85,23 +85,34 @@ function previewHTML() {
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
 function send(input) {
-  const prev = s.pending, tick = s.tick || 0;
-  if (input.type === 'roll') { const from = me().sq; g.act(s, input); lastDie = (me().sq - from + 36) % 36 || null; save(); return rollAnim(from).then(() => toasts(tick)); }
+  const prev = s.pending, tick = s.tick || 0, cash = me().cash;
+  if (input.type === 'roll') { const from = me().sq; g.act(s, input); lastDie = (me().sq - from + 36) % 36 || null; save(); return rollAnim(from).then(() => { toasts(tick); cashFlash(cash); }); }
   g.act(s, input);
   save(); render();
   window.scrollTo({ top: 0, behavior: 'smooth' });
   if (prev?.type === 'auction' && !(s.pending?.type === 'auction' && s.pending.pid === prev.pid)) auctionResult(prev.pid, tick);
-  toasts(tick);
+  toasts(tick); cashFlash(cash);
+}
+
+// the money pill flashes green or red with the change
+function cashFlash(before) {
+  const d = me().cash - before, pill = document.querySelector('.pill.gold');
+  if (!d || !pill) return;
+  const el = document.createElement('span');
+  el.className = `delta ${d > 0 ? 'up' : 'down'}`; el.textContent = (d > 0 ? '+' : '−') + g.money(Math.abs(d)).replace('-', '');
+  pill.classList.add('flash'); pill.appendChild(el);
+  setTimeout(() => { el.remove(); pill.classList.remove('flash'); }, 2600);
 }
 
 // What the other coaches just did, as notes that slide in and fade away on their own (tap to dismiss).
 function toasts(tick) {
-  const news = s.log.filter(l => l.t > tick && l.mi != null && l.mi !== 0 && !l.text.startsWith('—')).reverse().slice(-4);
+  const all = s.log.filter(l => l.t > tick && l.mi != null && !l.text.startsWith('—')).reverse();
+  const news = [...all.filter(l => l.mi === 0), ...all.filter(l => l.mi !== 0).slice(-4)];
   let box = document.querySelector('.toasts');
   if (!box) { box = document.createElement('div'); box.className = 'toasts'; document.body.appendChild(box); }
   news.forEach((l, i) => {
     const el = document.createElement('div');
-    el.className = 'toast'; el.style.animationDelay = `${i * 500}ms, ${i * 500 + 3200}ms`;
+    el.className = l.mi === 0 ? 'toast me' : 'toast'; el.style.animationDelay = `${i * 500}ms, ${i * 500 + 3200}ms`;
     el.innerHTML = `${dot(l.mi)}<span>${esc(l.text)}</span>`;
     el.addEventListener('click', () => el.remove());
     el.addEventListener('animationend', e => { if (e.animationName === 'tout') el.remove(); });

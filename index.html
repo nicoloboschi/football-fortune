@@ -214,6 +214,12 @@ main:has(~ .actbar:not(:empty)) { padding-bottom: 170px; }
 .rolehead { margin: 14px 0 -4px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; display: flex; align-items: center; gap: 6px; }
 .rolehead::before { content: ''; width: 10px; height: 10px; border-radius: 3px; background: var(--c); }
 .rolehead.G { --c: #d0861a; } .rolehead.D { --c: #2a6fb6; } .rolehead.M { --c: #1f8a46; } .rolehead.A { --c: #c8102e; } .rolehead.U { --c: #7650b3; }
+.toast.me { background: var(--accent); color: #2a2000; font-size: 14px; font-weight: 700; padding: 9px 12px; }
+.toast.me span { white-space: normal; }
+.pill.gold { position: relative; } .pill.flash { animation: pulse .6s 2; }
+@keyframes pulse { 50% { transform: scale(1.12); } }
+.delta { position: absolute; left: 0; top: 100%; margin-top: 4px; font-size: 13px; font-weight: 800; padding: 2px 8px; border-radius: 8px; white-space: nowrap; animation: tin .3s both; }
+.delta.up { background: var(--good); color: #fff; } .delta.down { background: var(--bad); color: #fff; }
 </style>
 </head>
 <body>
