@@ -126,7 +126,9 @@ async function rollAnim(from) {
 // Full-screen card with a stamp: won (confetti), lost to someone (shake), or unsold.
 function auctionResult(pid, tick) {
   const owner = s.owner[pid], won = owner === 0, sold = typeof owner === 'number';
-  const text = s.log.filter(l => l.t > tick).map(l => l.text).find(t => t.includes(' compra ') || t.startsWith('Nessuna offerta')) || '';
+  // the log line about this player (other auctions may have followed it), oldest first
+  const name = g.card(pid);
+  const text = s.log.filter(l => l.t > tick).reverse().map(l => l.text).find(t => t.includes(name) && (t.includes(' compra ') || t.startsWith('Nessuna offerta'))) || '';
   const el = document.createElement('div');
   el.className = `overlay ${won ? 'won' : sold ? 'lost' : 'none'}`;
   const bits = won ? Array.from({ length: 28 }, (_, i) => `<i style="left:${g.rnd(100)}%;background:${COLORS[i % 5]};animation-delay:${g.rnd(500)}ms;animation-duration:${1400 + g.rnd(900)}ms"></i>`).join('') : '';
