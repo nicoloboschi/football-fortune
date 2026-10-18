@@ -3,37 +3,51 @@
 // Players, clubs and texts are an Italian version: iconic Serie A players of the last 20 years,
 // with the same number of players per position and star rating as the original card pack.
 
+// [stars, name, iconic club, look]. look = skin 1-6, hair (s short, h buzz, l long, b bald, c curly, m mohawk,
+// p ponytail), hair colour (k black, b brown, y blond, g grey), beard 0-2. Drawn by art.js.
 const CARDS = {
-  G: [[5, 'Gianluigi Buffon'], [4, 'Samir Handanovič'], [4, 'Gianluigi Donnarumma'], [3, 'Júlio César'],
-    [3, 'Wojciech Szczęsny'], [3, 'Mike Maignan'], [3, 'Dida'], [2, 'Christian Abbiati'], [2, 'Salvatore Sirigu'],
-    [2, 'Mattia Perin'], [1, 'Marco Storari']],
-  D: [[5, 'Fabio Cannavaro'], [5, 'Alessandro Nesta'], [5, 'Giorgio Chiellini'], [5, 'Kalidou Koulibaly'],
-    [4, 'Paolo Maldini'], [4, 'Leonardo Bonucci'], [4, 'Andrea Barzagli'], [4, 'Thiago Silva'], [4, 'Lúcio'],
-    [4, 'Milan Škriniar'], [4, 'Theo Hernández'], [3, 'Walter Samuel'], [3, 'Alessandro Bastoni'],
-    [3, 'Marco Materazzi'], [3, 'Matthijs de Ligt'], [3, 'Kostas Manolas'], [3, 'Gleison Bremer'],
-    [3, 'Giovanni Di Lorenzo'], [2, 'Cafu'], [2, 'Chris Smalling'], [2, 'Alessio Romagnoli'], [2, 'Francesco Acerbi'],
-    [2, 'Medhi Benatia'], [2, 'Fikayo Tomori'], [2, 'Federico Dimarco'], [1, 'Andrea Ranocchia'],
-    [1, 'Cristián Zapata'], [1, 'Davide Astori'], [1, 'Philippe Mexès']],
-  M: [[5, 'Andrea Pirlo'], [5, 'Kaká'], [5, 'Wesley Sneijder'], [5, 'Paul Pogba'], [4, 'Gennaro Gattuso'],
-    [4, 'Arturo Vidal'], [4, 'Claudio Marchisio'], [4, 'Marek Hamšík'], [4, 'Sergej Milinković-Savić'],
-    [3, 'Miralem Pjanić'], [3, 'Esteban Cambiasso'], [3, 'Clarence Seedorf'], [3, 'Nicolò Barella'],
-    [3, 'Marcelo Brozović'], [3, 'Dejan Stanković'], [2, 'Jorginho'], [2, 'Allan'], [2, 'Franck Kessié'],
-    [2, 'Hakan Çalhanoğlu'], [2, 'Sandro Tonali'], [2, 'Stanislav Lobotka'], [1, 'Riccardo Montolivo'],
-    [1, 'Sulley Muntari'], [1, 'Felipe Melo'], [1, 'Andrea Poli']],
-  A: [[5, 'Francesco Totti'], [5, 'Zlatan Ibrahimović'], [5, 'Gonzalo Higuaín'], [5, 'Cristiano Ronaldo'],
-    [4, 'Alessandro Del Piero'], [4, 'Diego Milito'], [4, "Samuel Eto'o"], [4, 'Lautaro Martínez'],
-    [4, 'Victor Osimhen'], [3, 'Edinson Cavani'], [3, 'Ciro Immobile'], [3, 'Paulo Dybala'], [3, 'Carlos Tevez'],
-    [3, 'Khvicha Kvaratskhelia'], [3, 'Filippo Inzaghi'], [2, 'Antonio Di Natale'], [2, 'Romelu Lukaku'],
-    [2, 'Mauro Icardi'], [2, 'Lorenzo Insigne'], [2, 'Dries Mertens'], [2, 'Luca Toni'], [1, 'Giampaolo Pazzini'],
-    [1, 'Marco Borriello'], [1, 'Alessandro Matri'], [1, 'Alberto Gilardino']],
-  U: [[5, 'Javier Zanetti'], [5, 'Daniele De Rossi'], [5, 'Pavel Nedvěd'], [4, 'Gianluca Zambrotta'],
-    [4, 'Juan Cuadrado'], [4, 'Radja Nainggolan'], [3, 'Maicon'], [3, 'Stephan Lichtsteiner'],
-    [3, 'Alessandro Florenzi'], [3, 'Rafael Leão'], [3, 'Antonio Candreva'], [2, 'Ivan Perišić'],
-    [2, 'Giacomo Bonaventura'], [2, 'Goran Pandev'], [2, 'Alejandro Gómez'], [2, 'Federico Chiesa'],
-    [1, 'Matteo Darmian'], [1, 'Mattia De Sciglio'], [1, 'Federico Bernardeschi'], [1, 'Stephan El Shaarawy'],
-    [1, 'Simone Pepe']],
+  G: [[5, 'Gianluigi Buffon', 'JUV', '2sb1'], [4, 'Samir Handanovič', 'INT', '1hb1'], [4, 'Gianluigi Donnarumma', 'MIL', '2sk1'],
+    [3, 'Júlio César', 'INT', '3hk1'], [3, 'Wojciech Szczęsny', 'JUV', '1sb1'], [3, 'Mike Maignan', 'MIL', '5hk2'],
+    [3, 'Dida', 'MIL', '6hk0'], [2, 'Christian Abbiati', 'MIL', '2sb0'], [2, 'Salvatore Sirigu', 'TOR', '2sk2'],
+    [2, 'Mattia Perin', 'GEN', '1sb2'], [1, 'Marco Storari', 'JUV', '2bg1']],
+  D: [[5, 'Fabio Cannavaro', 'JUV', '3hk0'], [5, 'Alessandro Nesta', 'MIL', '2sk1'], [5, 'Giorgio Chiellini', 'JUV', '2sk2'],
+    [5, 'Kalidou Koulibaly', 'NAP', '6hk1'], [4, 'Paolo Maldini', 'MIL', '2lk0'], [4, 'Leonardo Bonucci', 'JUV', '2sk1'],
+    [4, 'Andrea Barzagli', 'JUV', '2hb1'], [4, 'Thiago Silva', 'MIL', '4hk1'], [4, 'Lúcio', 'INT', '4bk0'],
+    [4, 'Milan Škriniar', 'INT', '1sb1'], [4, 'Theo Hernández', 'MIL', '3sk1'], [3, 'Walter Samuel', 'INT', '3lk1'],
+    [3, 'Alessandro Bastoni', 'INT', '1sb0'], [3, 'Marco Materazzi', 'INT', '2bk1'], [3, 'Matthijs de Ligt', 'JUV', '1sy0'],
+    [3, 'Kostas Manolas', 'ROM', '2hk2'], [3, 'Gleison Bremer', 'TOR', '5hk1'], [3, 'Giovanni Di Lorenzo', 'NAP', '2sb1'],
+    [2, 'Cafu', 'MIL', '6bk0'], [2, 'Chris Smalling', 'ROM', '5hk1'], [2, 'Alessio Romagnoli', 'MIL', '1sb1'],
+    [2, 'Francesco Acerbi', 'LAZ', '1bg2'], [2, 'Medhi Benatia', 'ROM', '4hk2'], [2, 'Fikayo Tomori', 'MIL', '5ck0'],
+    [2, 'Federico Dimarco', 'INT', '2sb2'], [1, 'Andrea Ranocchia', 'INT', '2sk2'], [1, 'Cristián Zapata', 'MIL', '5hk0'],
+    [1, 'Davide Astori', 'FIO', '2sk2'], [1, 'Philippe Mexès', 'ROM', '2mk1']],
+  M: [[5, 'Andrea Pirlo', 'MIL', '2lk2'], [5, 'Kaká', 'MIL', '3sk0'], [5, 'Wesley Sneijder', 'INT', '1sy0'],
+    [5, 'Paul Pogba', 'JUV', '6my0'], [4, 'Gennaro Gattuso', 'MIL', '2sk2'], [4, 'Arturo Vidal', 'JUV', '4mk1'],
+    [4, 'Claudio Marchisio', 'JUV', '2sk1'], [4, 'Marek Hamšík', 'NAP', '1mk0'], [4, 'Sergej Milinković-Savić', 'LAZ', '1sb1'],
+    [3, 'Miralem Pjanić', 'JUV', '2sk1'], [3, 'Esteban Cambiasso', 'INT', '2bk0'], [3, 'Clarence Seedorf', 'MIL', '5hk0'],
+    [3, 'Nicolò Barella', 'INT', '2sb1'], [3, 'Marcelo Brozović', 'INT', '1sb1'], [3, 'Dejan Stanković', 'INT', '2sk1'],
+    [2, 'Jorginho', 'NAP', '2sk2'], [2, 'Allan', 'NAP', '4sk2'], [2, 'Franck Kessié', 'MIL', '6hk1'],
+    [2, 'Hakan Çalhanoğlu', 'INT', '2sk2'], [2, 'Sandro Tonali', 'MIL', '1lb0'], [2, 'Stanislav Lobotka', 'NAP', '1hb1'],
+    [1, 'Riccardo Montolivo', 'FIO', '2sb1'], [1, 'Sulley Muntari', 'INT', '6hk0'], [1, 'Felipe Melo', 'JUV', '4sk1'],
+    [1, 'Andrea Poli', 'SAM', '2sk1']],
+  A: [[5, 'Francesco Totti', 'ROM', '2sb0'], [5, 'Zlatan Ibrahimović', 'MIL', '3pk2'], [5, 'Gonzalo Higuaín', 'NAP', '3sk1'],
+    [5, 'Cristiano Ronaldo', 'JUV', '3sk0'], [4, 'Alessandro Del Piero', 'JUV', '2sk0'], [4, 'Diego Milito', 'INT', '3lk1'],
+    [4, "Samuel Eto'o", 'INT', '6hk0'], [4, 'Lautaro Martínez', 'INT', '3sk1'], [4, 'Victor Osimhen', 'NAP', '6my0'],
+    [3, 'Edinson Cavani', 'NAP', '3lk2'], [3, 'Ciro Immobile', 'LAZ', '2sk2'], [3, 'Paulo Dybala', 'JUV', '2sk1'],
+    [3, 'Carlos Tevez', 'JUV', '3sk0'], [3, 'Khvicha Kvaratskhelia', 'NAP', '1lb0'], [3, 'Filippo Inzaghi', 'MIL', '2sk0'],
+    [2, 'Antonio Di Natale', 'UDI', '2sk0'], [2, 'Romelu Lukaku', 'INT', '6hk1'], [2, 'Mauro Icardi', 'INT', '2sk1'],
+    [2, 'Lorenzo Insigne', 'NAP', '2sk1'], [2, 'Dries Mertens', 'NAP', '1sy0'], [2, 'Luca Toni', 'FIO', '2lk2'],
+    [1, 'Giampaolo Pazzini', 'SAM', '2sk0'], [1, 'Marco Borriello', 'GEN', '2sk1'], [1, 'Alessandro Matri', 'CAG', '2sk1'],
+    [1, 'Alberto Gilardino', 'FIO', '2sk1']],
+  U: [[5, 'Javier Zanetti', 'INT', '3sk0'], [5, 'Daniele De Rossi', 'ROM', '2sy2'], [5, 'Pavel Nedvěd', 'JUV', '1ly0'],
+    [4, 'Gianluca Zambrotta', 'JUV', '2sk0'], [4, 'Juan Cuadrado', 'JUV', '5mk0'], [4, 'Radja Nainggolan', 'ROM', '4mk1'],
+    [3, 'Maicon', 'INT', '5hk0'], [3, 'Stephan Lichtsteiner', 'JUV', '1sb0'], [3, 'Alessandro Florenzi', 'ROM', '2sk1'],
+    [3, 'Rafael Leão', 'MIL', '5ck0'], [3, 'Antonio Candreva', 'LAZ', '2sk2'], [2, 'Ivan Perišić', 'INT', '1sb1'],
+    [2, 'Giacomo Bonaventura', 'MIL', '2sk2'], [2, 'Goran Pandev', 'INT', '2hk1'], [2, 'Alejandro Gómez', 'ATA', '2sk1'],
+    [2, 'Federico Chiesa', 'FIO', '2sb0'], [1, 'Matteo Darmian', 'INT', '2sk1'], [1, 'Mattia De Sciglio', 'MIL', '2sk0'],
+    [1, 'Federico Bernardeschi', 'FIO', '2lb2'], [1, 'Stephan El Shaarawy', 'ROM', '4mk0'], [1, 'Simone Pepe', 'JUV', '2sk1']],
 };
-export const PLAYERS = Object.entries(CARDS).flatMap(([pos, list]) => list.map(([stars, name]) => ({ pos, stars, name })))
+const CLUB = { JUV: 1, INT: 2, MIL: 3, NAP: 4, ROM: 5, LAZ: 6, ATA: 7, FIO: 8, BOL: 9, TOR: 10, GEN: 11, SAM: 12, UDI: 13, CAG: 16 };
+export const PLAYERS = Object.entries(CARDS).flatMap(([pos, list]) => list.map(([stars, name, club, look]) => ({ pos, stars, name, club: CLUB[club], look })))
   .map((p, id) => ({ id, ...p }));
 export const POS_NAME = { G: 'Portiere', D: 'Difensore', M: 'Centrocampista', A: 'Attaccante', U: 'Jolly' };
 export const POS_SHORT = { G: 'P', D: 'D', M: 'C', A: 'A', U: 'J' };
@@ -50,6 +64,45 @@ export const TEAMS = [null, 'Juventus', 'Inter', 'Milan', 'Napoli', 'Roma', 'Laz
   'Rangers', 'Young Boys', 'Slavia Praga', 'Ferencváros', 'Malmö', 'Marsiglia', 'Monaco', 'Real Madrid',
   'Barcellona', 'Bayern Monaco', 'Manchester City', 'Liverpool', 'PSG', 'Chelsea', 'Manchester United',
   'Atlético Madrid', 'Arsenal'];
+// Starting XI shown for Serie A clubs run by the computer (not cards: they never trade).
+// Order: keeper, 4 defenders, 3 midfielders, 3 attackers, best first in each line.
+// Their stars are dealt each season so that they add up to the club's Defence and Attack.
+export const CLUB_XI = [null,
+  ['Neto', 'Danilo', 'Alex Sandro', 'Martín Cáceres', 'Zdeněk Grygera', 'Mauro Camoranesi', 'Sami Khedira', 'Adrien Rabiot', 'Mario Mandžukić', 'Álvaro Morata', 'Fernando Llorente'],
+  ['Francesco Toldo', 'Iván Córdoba', 'Stefan de Vrij', 'Cristian Chivu', 'Denzel Dumfries', 'Patrick Vieira', 'Thiago Motta', 'Henrikh Mkhitaryan', 'Adriano', 'Marcus Thuram', 'Rodrigo Palacio'],
+  ['Marco Amelia', 'Kakha Kaladze', 'Davide Calabria', 'Ignazio Abate', 'Daniele Bonera', 'Massimo Ambrosini', 'Ismaël Bennacer', 'Kevin-Prince Boateng', 'Olivier Giroud', 'Alexandre Pato', 'Robinho'],
+  ['Morgan De Sanctis', 'Raúl Albiol', 'Paolo Cannavaro', 'Faouzi Ghoulam', 'Christian Maggio', 'Piotr Zieliński', 'Walter Gargano', 'Blerim Džemaili', 'Ezequiel Lavezzi', 'José Callejón', 'Arkadiusz Milik'],
+  ['Alisson', 'Juan', 'Christian Panucci', 'Aleksandar Kolarov', 'Gianluca Mancini', 'Lorenzo Pellegrini', 'David Pizarro', 'Simone Perrotta', 'Mohamed Salah', 'Edin Džeko', 'Mirko Vučinić'],
+  ['Federico Marchetti', 'Ştefan Radu', 'Adam Marušić', 'Senad Lulić', 'Giuseppe Biava', 'Luis Alberto', 'Lucas Biglia', 'Cristian Ledesma', 'Miroslav Klose', 'Felipe Anderson', 'Tommaso Rocchi'],
+  ['Marco Sportiello', 'Rafael Tolói', 'Berat Djimsiti', 'José Luis Palomino', 'Hans Hateboer', 'Teun Koopmeiners', 'Marten de Roon', 'Remo Freuler', 'Josip Iličić', 'Duván Zapata', 'Ademola Lookman'],
+  ['Sébastien Frey', 'Nikola Milenković', 'Dario Dainelli', 'Per Krøldrup', 'Manuel Pasqual', 'Borja Valero', 'Matías Vecino', 'Marco Benassi', 'Dušan Vlahović', 'Adrian Mutu', 'Giuseppe Rossi'],
+  ['Łukasz Skorupski', 'Riccardo Calafiori', 'Sam Beukema', 'Lorenzo De Silvestri', 'Adama Soumaoro', 'Lewis Ferguson', 'Gary Medel', 'Diego Pérez', 'Joshua Zirkzee', 'Marco Di Vaio', 'Riccardo Orsolini'],
+  ['Vanja Milinković-Savić', 'Kamil Glik', 'Angelo Ogbonna', 'Nicolas Nkoulou', 'Cristian Molinaro', 'Daniele Baselli', 'Tomás Rincón', 'Saša Lukić', 'Andrea Belotti', 'Alessio Cerci', 'Fabio Quagliarella']];
+
+// Kit colours per club, used for badges and shirts: [main, second, pattern]
+// pattern: s stripes, h halves, p plain, b chest band, o hoops, v centre stripe
+export const KITS = [null,
+  ['#ffffff', '#111111', 's'], ['#0a4ea3', '#111111', 's'], ['#d71920', '#111111', 's'], ['#12a0d7', '#ffffff', 'p'],
+  ['#8e1f2f', '#f0bc42', 'p'], ['#87d3f2', '#ffffff', 'p'], ['#1e71b8', '#111111', 's'], ['#5b2a86', '#ffffff', 'p'],
+  ['#1a2f48', '#a21c26', 's'], ['#8a1e03', '#ffffff', 'p'], ['#a2192c', '#002c5f', 'h'], ['#1b5497', '#ffffff', 'b'],
+  ['#ffffff', '#111111', 's'], ['#00a752', '#111111', 's'], ['#002f6c', '#ffd200', 'p'], ['#a6192e', '#002350', 'h'],
+  ['#ffffff', '#111111', 'b'], ['#005baa', '#ffffff', 'p'], ['#e30613', '#ffd400', 's'], ['#e2001a', '#ffffff', 'b'],
+  ['#f4a7b9', '#111111', 'p'], ['#ffffff', '#d71920', 'b'], ['#0050a5', '#ffffff', 'b'], ['#c8102e', '#a3a3a3', 's'],
+  ['#ffffff', '#111111', 'p'], ['#111111', '#f47b20', 'b'], ['#111111', '#1b3f8f', 's'], ['#7b1e3a', '#ffffff', 'p'],
+  ['#ffd200', '#0047ab', 'p'], ['#ffd200', '#c8102e', 'h'], ['#c8102e', '#ffffff', 'p'], ['#c8102e', '#111111', 's'],
+  ['#ffffff', '#c8102e', 'b'], ['#ffffff', '#c8102e', 's'], ['#00843d', '#ffffff', 'p'], ['#ffffff', '#0a6fb7', 's'],
+  ['#c8102e', '#ffffff', 'p'], ['#c8102e', '#003da5', 's'], ['#c8102e', '#00843d', 's'], ['#8b1a2b', '#ffffff', 'p'],
+  ['#0047ab', '#ffffff', 's'], ['#fde100', '#111111', 'p'], ['#ffffff', '#1d3c8f', 'b'], ['#ffffff', '#d71920', 'p'],
+  ['#e30613', '#ffffff', 'p'], ['#ffffff', '#d2122e', 'v'], ['#e32221', '#111111', 'p'], ['#008a3e', '#ffffff', 'o'],
+  ['#ed1c24', '#ffffff', 's'], ['#a90432', '#fdb912', 'h'], ['#163962', '#ffed00', 's'], ['#ed1c24', '#ffffff', 's'],
+  ['#0d47a1', '#ffffff', 'p'], ['#d71920', '#ffffff', 's'], ['#f47b20', '#111111', 's'], ['#ffffff', '#1e5aa8', 'p'],
+  ['#ffffff', '#d2122e', 'p'], ['#0074bf', '#111111', 's'], ['#ffffff', '#0d3b8e', 'p'], ['#d2122e', '#00205b', 'h'],
+  ['#e30613', '#ffffff', 'h'], ['#008057', '#ffffff', 'o'], ['#d2122e', '#ffffff', 'p'], ['#1b458f', '#ffffff', 'p'],
+  ['#fdd800', '#111111', 'p'], ['#d2122e', '#ffffff', 'h'], ['#00843d', '#ffffff', 's'], ['#7ec8f2', '#ffffff', 'p'],
+  ['#ffffff', '#2faee0', 'p'], ['#e30613', '#ffffff', 'h'], ['#ffffff', '#f0c330', 'p'], ['#a50044', '#004d98', 's'],
+  ['#dc052d', '#ffffff', 'p'], ['#6cabdd', '#ffffff', 'p'], ['#c8102e', '#ffffff', 'p'], ['#004170', '#da291c', 'v'],
+  ['#034694', '#ffffff', 'p'], ['#da291c', '#ffffff', 'p'], ['#cb3524', '#ffffff', 's'], ['#ef0107', '#ffffff', 'p']];
+
 // European opponents per competition (from the original program's draw table)
 export const EURO_POOL = {
   EC: [41, 42, 43, 44, 69, 70, 71, 72, 73, 74],

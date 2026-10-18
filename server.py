@@ -5,7 +5,7 @@ import http.server, os, sys
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 STATE = os.path.join(ROOT, "state.json")
-FILES = {"/": "index.html", "/index.html": "index.html", "/app.js": "app.js", "/game.js": "game.js", "/data.js": "data.js"}
+FILES = {"/": "index.html", "/index.html": "index.html", "/app.js": "app.js", "/game.js": "game.js", "/data.js": "data.js", "/art.js": "art.js"}
 
 
 class H(http.server.BaseHTTPRequestHandler):

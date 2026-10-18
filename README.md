@@ -18,6 +18,12 @@ The save is `state.json` (server side, plus a browser copy), so a new tunnel URL
   all 40 Manager's Luck and 37 Selection Problem texts, 80 teams, starting squads:
   decoded from the ZX Spectrum program (BASIC + saved variables).
 
+## Look
+- Player cards with home-made cartoon players in their iconic club's shirt (`art.js`, inline SVG).
+- Club badges are home-made from club colours and kit patterns, not the real crests.
+- Every Serie A club shows real players: computer-run clubs get a real XI (`CLUB_XI`) whose stars are dealt
+  to add up to the club's Defence and Attack, so the original strength rules are unchanged.
+
 ## Changes from the original
 - Italian text, Serie A instead of the First Division, Coppa Italia instead of the FA Cup, modern European clubs
   (kept in the original's strength tiers), euros instead of pounds.

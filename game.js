@@ -720,3 +720,21 @@ function trade(s, { type, pid, price, to }) {
   log(s, s.notice, h.i);
   return s;
 }
+
+// Real XI for a computer-run Serie A club. Stars are dealt so lines add up to the club's Defence and Attack.
+const XI_SKIN = { Adriano: 5, 'Marcus Thuram': 5, 'Denzel Dumfries': 5, 'Patrick Vieira': 6, 'Kevin-Prince Boateng': 5,
+  'Ismaël Bennacer': 3, Robinho: 4, 'Alexandre Pato': 3, Juan: 4, 'Mohamed Salah': 4, 'Felipe Anderson': 4, 'Ademola Lookman': 6,
+  'Duván Zapata': 5, 'Adama Soumaoro': 6, 'Nicolas Nkoulou': 6, 'Faouzi Ghoulam': 4, Danilo: 4, 'Alex Sandro': 4,
+  'Thiago Motta': 3, 'Tomás Rincón': 4, 'Gary Medel': 3, 'Angelo Ogbonna': 5, 'Joshua Zirkzee': 4, 'Rafael Tolói': 3, 'Neto': 3 };
+export function clubXI(s, team) {
+  if (!s.strengthsSet || team > 10) return null;
+  const deal = (total, n) => Array.from({ length: n }, (_, i) => Math.max(1, Math.min(5, Math.floor(total / n) + (i < total % n ? 1 : 0))));
+  const names = D.CLUB_XI[team], def = deal(s.D[team], 5), att = deal(s.A[team], 6);
+  const pos = ['G', 'D', 'D', 'D', 'D', 'M', 'M', 'M', 'A', 'A', 'A'];
+  const attOrder = [8, 5, 9, 6, 10, 7]; // best attacker, best midfielder, ...
+  const stars = [...def, ...Array(6)];
+  attOrder.forEach((idx, k) => { stars[idx] = att[k]; });
+  const h = str => [...str].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+  return names.map((name, i) => ({ name, pos: pos[i], stars: stars[i], club: team,
+    look: `${XI_SKIN[name] || 2}${'sshlbc'[h(name) % 6]}${'kkbby'[h(name + 'h') % 5]}${h(name + 'b') % 3}` }));
+}

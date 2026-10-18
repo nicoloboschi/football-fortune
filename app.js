@@ -1,14 +1,15 @@
 import * as g from './game.js';
 import * as D from './data.js';
+import { crest, avatar } from './art.js';
 
 const COLORS = ['#f2c230', '#e4002b', '#00a3e0', '#ff7a00', '#8a2be2'];
 const app = document.getElementById('app');
-let s = null, tab = 'play', lastDie = null, squadOf = 0, offer = null, confirmNew = false;
+let s = null, tab = 'play', lastDie = null, squadOf = null, offer = null, confirmNew = false;
 
 // ---------- persistence: server file (survives a new tunnel URL) + browser copy ----------
 async function load() {
   try { const r = await fetch('api/state'); if (r.ok) { const j = await r.json(); if (j && j.v === 2) return j; } } catch {}
-  try { const j = JSON.parse(localStorage.getItem("ff-save")); return j?.v === 2 ? j : null; } catch { return null; }
+  try { const j = JSON.parse(localStorage.getItem('ff-save')); return j?.v === 2 ? j : null; } catch { return null; }
 }
 function save() {
   const body = JSON.stringify(s);
@@ -18,21 +19,29 @@ function save() {
 
 // ---------- helpers ----------
 const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const stars = n => '★'.repeat(n);
 const P = pid => D.PLAYERS[pid];
 const me = () => s.managers[0];
 const dot = i => `<span class="dot" style="background:${COLORS[i]}"></span>`;
 const btn = (label, a, { cls = '', dis = false } = {}) => `<button class="${cls}" data-a="${esc(JSON.stringify(a))}" ${dis ? 'disabled' : ''}>${label}</button>`;
+const club = (t, size = 22) => `<span class="clubname">${crest(t, size)}<span>${esc(D.TEAMS[t])}</span></span>`;
 const tagsFor = pid => (s.out[pid] ? '<span class="tag red">fuori 1 gara</span>' : '') + (s.loans.some(l => l.pid === pid && l.to === 0) ? '<span class="tag">in prestito</span>' : '');
-const pl = (pid, right = '', tags = '') => `<div class="player"><div class="pname"><span class="pos ${P(pid).pos}">${D.POS_SHORT[P(pid).pos]}</span>
-  <div style="min-width:0"><div class="n">${esc(P(pid).name)}</div><span class="stars">${stars(P(pid).stars)}</span> ${tags}</div></div><div>${right}</div></div>`;
-const surname = n => n.includes(' ') ? n.split(' ').slice(1).join(' ') : n;
+
+// Player card: level + stars, cartoon in his club shirt, first name, SURNAME, role. p = player object.
+function cardHTML(p, footer = '', { tags = '', big = false } = {}) {
+  const sp = p.name.indexOf(' '), first = sp > 0 ? p.name.slice(0, sp) : '', last = sp > 0 ? p.name.slice(sp + 1) : p.name;
+  const fs = last.length > 14 ? 11 : last.length > 11 ? 13 : last.length > 8 ? 15 : 18;
+  return `<div class="pcard ${p.pos}${big ? ' big' : ''}"><div class="ph"><div><small>LIVELLO</small><div class="st">${'★'.repeat(p.stars)}<span>${'★'.repeat(5 - p.stars)}</span></div></div><div class="num">${p.stars}</div></div>
+    <div class="art">${avatar(p)}<span class="pclub">${crest(p.club, 18)}</span></div>
+    <div class="first">${esc(first) || '&nbsp;'}</div><div class="last" style="font-size:${big ? fs + 4 : fs}px">${esc(last.toUpperCase())}</div>
+    <div class="role">${D.POS_NAME[p.pos].toUpperCase()}</div>${tags ? `<div class="ctags">${tags}</div>` : ''}${footer ? `<div class="cfoot">${footer}</div>` : ''}</div>`;
+}
+const cards = list => `<div class="cards">${list.join('')}</div>`;
 
 function send(input) {
   if (input.type === 'roll') { const before = me().sq; g.act(s, input); lastDie = (me().sq - before + 36) % 36 || null; }
   else g.act(s, input);
   save(); render();
-  if (input.type !== 'bankBuy') window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // ---------- setup ----------
@@ -41,16 +50,20 @@ function setup() {
   <div class="card"><h3>Nuova partita</h3>
     <p class="muted">Alleni un club di Serie A contro allenatori del computer. Giri il tabellone, compri campioni all'asta, affronti Fortuna e Problemi di formazione, poi giochi campionato, Coppa Italia e coppe europee. Vince chi ha più punti alla fine.</p>
     <label>Il tuo nome</label><input id="name" value="Nicolò" maxlength="14">
-    <label>La tua squadra</label><select id="club">${D.TEAMS.slice(1, 11).map((t, i) => `<option value="${i + 1}">${t}</option>`).join('')}</select>
+    <label>La tua squadra</label><div class="clubpick">${D.TEAMS.slice(1, 11).map((t, i) => `<button class="alt small${i ? '' : ' on'}" data-club="${i + 1}">${crest(i + 1, 24)}<span>${t}</span></button>`).join('')}</div>
     <label>Allenatori avversari</label><select id="cpus"><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
     <label>Difficoltà (forza delle squadre del computer)</label><select id="level"><option value="1">1 · Facile</option><option value="2" selected>2 · Media</option><option value="3">3 · Difficile</option><option value="4">4 · Esperto</option></select>
     <label>Stagioni</label><select id="seasons"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option></select>
     <button class="big" id="start">Fischio d'inizio</button>
   </div></main>`;
+  let pickedClub = 1;
+  app.querySelectorAll('[data-club]').forEach(b => b.onclick = () => {
+    pickedClub = +b.dataset.club; app.querySelectorAll('[data-club]').forEach(x => x.classList.toggle('on', x === b));
+  });
   document.getElementById('start').onclick = () => {
     const v = id => document.getElementById(id).value;
-    s = g.newGame({ name: v('name') || 'Mister', club: +v('club'), cpus: +v('cpus'), level: +v('level'), seasons: +v('seasons') });
-    tab = 'play'; save(); render();
+    s = g.newGame({ name: v('name') || 'Mister', club: pickedClub, cpus: +v('cpus'), level: +v('level'), seasons: +v('seasons') });
+    tab = 'play'; squadOf = null; save(); render();
   };
 }
 
@@ -70,10 +83,10 @@ function boardHTML() {
 function matchHTML(l) {
   const mineH = l.mh === 0, mineA = l.ma === 0, mine = mineH || mineA;
   const team = (t, mi, d, a, away) => `<div class="team${away ? ' away' : ''}${mi === 0 ? ' me' : ''}">
-    <div class="tn">${!away && mi != null ? dot(mi) : ''}<span>${esc(D.TEAMS[t])}</span>${away && mi != null ? dot(mi) : ''}</div>
-    <div class="da">Dif <i>${d}</i> · Att <i>${a}</i></div></div>`;
-  const myGoals = mineH ? l.x : l.y, theirs = mineH ? l.y : l.x;
-  const cls = !mine ? '' : myGoals > theirs ? 'win' : myGoals < theirs ? 'loss' : '';
+    <div class="tn">${away ? '' : crest(t, 20)}<span>${esc(D.TEAMS[t])}</span>${away ? crest(t, 20) : ''}</div>
+    <div class="da">${!away && mi != null ? dot(mi) + ' ' : ''}Dif <i>${d}</i> · Att <i>${a}</i>${away && mi != null ? ' ' + dot(mi) : ''}</div></div>`;
+  const my = mineH ? l.x : l.y, their = mineH ? l.y : l.x;
+  const cls = !mine ? '' : my > their ? 'win' : my < their ? 'loss' : '';
   return `<div class="match${mine ? ' mine' : ''}">${team(l.h, l.mh, l.hd, l.ha, false)}<div class="score ${cls}">${l.x} - ${l.y}</div>${team(l.a, l.ma, l.ad, l.aa, true)}
     ${l.g != null && (l.mh != null || l.ma != null) ? `<div class="gate">Incasso ${g.money(l.g)} · metà a ogni allenatore</div>` : ''}</div>`;
 }
@@ -90,20 +103,20 @@ function pendingHTML() {
     case 'choose': return `<div class="card hero"><h2>${esc(p.title)}</h2><div class="cardtext">${esc(p.text)}</div>
       <div class="stack">${p.options.map((o, i) => btn(esc(o.label), { type: 'choose', id: o.id }, { cls: i ? 'alt' : '' })).join('')}</div></div>`;
     case 'pick': return `<div class="card hero"><h2>${esc(p.title)}</h2><div class="muted">${esc(p.text)}</div>
-      ${p.pids.map(pid => pl(pid, btn(p.prices ? g.money(p.prices[pid]) : 'Scegli', { type: 'pick', pid }, { cls: 'small', dis: p.prices && p.title.startsWith('Compra') && p.prices[pid] > h.cash }))).join('')}
+      ${cards(p.pids.map(pid => cardHTML(P(pid), btn(p.prices ? g.money(p.prices[pid]) : 'Scegli', { type: 'pick', pid }, { cls: 'small', dis: p.prices && p.title.startsWith('Compra') && p.prices[pid] > h.cash }))))}
       ${p.optional ? btn('Salta', { type: 'skip' }, { cls: 'alt big' }) : ''}</div>`;
     case 'sell': {
       const mine = g.squad(s, h).filter(pid => s.owner[pid] === 0), xi = new Set(g.lineup(s, h, { withOut: true }).xi);
       return `<div class="card hero"><h2>${p.forced ? 'Servono soldi' : 'Banca'}</h2>
       <h3>${p.forced ? `Ti mancano ${g.money(p.need)}` : 'Vendi alla banca'}</h3>
       <div class="muted">${p.forced ? 'Non puoi pagare: vendi giocatori alla banca a ¾ del loro valore.' : 'Puoi vendere giocatori alla banca a ¾ del valore. Tieni abbastanza uomini per il 4-3-3!'}</div>
-      ${mine.map(pid => pl(pid, btn(g.money(g.nominal(pid) * 3 / 4), { type: 'sell', pid }, { cls: 'small' }), (xi.has(pid) ? '<span class="tag">titolare</span>' : '') + tagsFor(pid))).join('')}
+      ${cards(mine.map(pid => cardHTML(P(pid), btn(`Vendi ${g.money(g.nominal(pid) * 3 / 4)}`, { type: 'sell', pid }, { cls: 'small' }), { tags: (xi.has(pid) ? '<span class="tag">titolare</span>' : '') + tagsFor(pid) })))}
       ${p.forced ? '' : btn('Fatto', { type: 'done' }, { cls: 'big' })}</div>`;
     }
     case 'auction': {
       const opts = [p.next, p.next + p.step, p.next + 4 * p.step, p.next + 10 * p.step].filter((v, i, a) => v <= p.cap && a.indexOf(v) === i);
-      return `<div class="card hero auction"><h2>${p.src === 'bank' ? 'Vendita della banca' : p.half ? 'Asta al 50%' : 'Asta'}</h2>
-      ${pl(p.pid, `<span class="muted">valore ${g.money(g.nominal(p.pid))}</span>`)}
+      return `<div class="card hero auction"><h2>${p.src === 'bank' ? 'Vendita della banca' : p.half ? 'Asta al 50%' : 'Asta'} · valore ${g.money(g.nominal(p.pid))}</h2>
+      <div class="solo">${cardHTML(P(p.pid), '', { big: true })}</div>
       <div class="bid">${p.bidder == null ? 'Nessuna offerta' : `${dot(p.bidder)} ${esc(s.managers[p.bidder].name)}: ${g.money(p.high)}`}</div>
       <div class="muted">${p.half && p.lander === 0 ? 'Asta al 50%: se vinci paghi metà. ' : ''}${p.src === 'bank' ? 'Minimo 1½ volte il valore. ' : ''}Hai ${g.money(h.cash)}.</div>
       <div class="btns">${opts.map(v => btn(`Offri ${g.money(v)}`, { type: 'bid', amount: v })).join('')}</div>
@@ -121,19 +134,35 @@ function feedHTML() {
     `<div class="${l.text.startsWith('—') ? 'wk' : l.mi === 0 ? 'me' : ''}">${l.mi != null && !l.text.startsWith('—') ? dot(l.mi) + ' ' : ''}${esc(l.text.replace(/^— | —$/g, ''))}</div>`).join('')}</div>`;
 }
 
-// ---------- squad ----------
+// ---------- squads: every Serie A club ----------
+function pitch(lines) {
+  const chip = p => p ? `<div class="chip"><b>${esc(p.name.includes(' ') ? p.name.slice(p.name.indexOf(' ') + 1) : p.name)}</b><span class="stars">${'★'.repeat(p.stars)}</span></div>` : `<div class="chip"><b>—</b></div>`;
+  return `<div class="pitch">${lines.map(l => `<div class="line">${l.map(chip).join('')}</div>`).join('')}</div>`;
+}
+const sums = (d, a) => `<div class="sums"><div class="sum"><b>${d}</b><small>Difesa</small></div><div class="sum"><b>${a}</b><small>Attacco</small></div><div class="sum"><b>${d + a}</b><small>Totale</small></div></div>`;
+
 function squadHTML() {
-  const m = s.managers[squadOf], lu = g.lineup(s, m), all = g.squad(s, m), xi = new Set(lu.xi);
-  const chip = pid => pid == null ? `<div class="chip"><b>—</b></div>` : `<div class="chip"><b>${esc(surname(P(pid).name))}</b><span class="stars">${stars(P(pid).stars)}</span></div>`;
-  const row = pos => lu.slots.filter(x => x.pos === pos).map(x => chip(x.pid)).join('');
-  return `<div class="seg" style="margin-bottom:14px">${s.managers.map(o => btn(`${dot(o.i)} ${esc(o.name)}`, { view: o.i }, { cls: 'small' + (o.i === squadOf ? '' : ' alt') })).join('')}</div>
-  <div class="card"><h2>${esc(m.name)}${m.bankrupt ? ' · in bancarotta' : ''}</h2><h3>${esc(D.TEAMS[m.club])}</h3>
-  <div class="sums"><div class="sum"><b>${lu.def}</b><small>Difesa</small></div><div class="sum"><b>${lu.att}</b><small>Attacco</small></div><div class="sum"><b>${lu.def + lu.att}</b><small>Totale</small></div></div>
+  const team = squadOf ?? me().club;
+  const picker = `<div class="seg" style="margin-bottom:14px">${(s.order || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).map(t => {
+    const m = g.managerOf(s, t);
+    return `<button class="small clubbtn${t === team ? '' : ' alt'}" data-team="${t}">${crest(t, 20)}${m ? dot(m.i) : ''}</button>`;
+  }).join('')}</div>`;
+  const m = g.managerOf(s, team);
+  if (!m) {
+    const xi = g.clubXI(s, team);
+    if (!xi) return picker + `<div class="card"><h3>${club(team, 26)}</h3><p class="muted">Squadra del computer. La formazione si vede dopo la prima giornata della stagione.</p></div>`;
+    return picker + `<div class="card"><h2>Squadra del computer · ${s.pos[team]}° in classifica</h2><h3>${club(team, 26)}</h3>${sums(s.D[team], s.A[team])}
+      ${pitch([xi.slice(8, 11), xi.slice(5, 8), xi.slice(1, 5), [xi[0]]])}
+      <p class="muted">Le squadre del computer non vanno sul mercato: la loro forza cambia a ogni stagione.</p></div>
+      <div class="card"><h2>Formazione</h2>${cards(xi.map(p => cardHTML(p)))}</div>`;
+  }
+  const lu = g.lineup(s, m), all = g.squad(s, m), xiSet = new Set(lu.xi), byPos = pos => lu.slots.filter(x => x.pos === pos).map(x => x.pid == null ? null : P(x.pid));
+  return picker + `<div class="card"><h2>${dot(m.i)} ${esc(m.name)}${m.bankrupt ? ' · in bancarotta' : ''}</h2><h3>${club(team, 26)}</h3>${sums(lu.def, lu.att)}
   ${lu.full ? '' : '<div class="notice" style="margin-top:10px">Non riesci a schierare un 4-3-3 completo: forza 0 e niente incasso!</div>'}
-  <div class="pitch"><div class="line">${row('A')}</div><div class="line">${row('M')}</div><div class="line">${row('D')}</div><div class="line">${chip(lu.gk)}</div></div>
+  ${pitch([byPos('A'), byPos('M'), byPos('D'), [lu.gk == null ? null : P(lu.gk)]])}
   <div class="muted" style="margin-top:10px">Cassa ${g.money(m.cash)} · Stipendi ${g.money(g.wages(s, m))} · Carte Immunità ${m.immunity}</div></div>
-  <div class="card"><h2>Rosa · ${all.length} giocatori</h2>${all.sort((a, b) => 'GDMAU'.indexOf(P(a).pos) - 'GDMAU'.indexOf(P(b).pos) || P(b).stars - P(a).stars)
-    .map(pid => pl(pid, xi.has(pid) ? '<span class="tag">titolare</span>' : '<span class="muted">riserva</span>', tagsFor(pid))).join('')}
+  <div class="card"><h2>Rosa · ${all.length} giocatori</h2>${cards(all.sort((a, b) => 'GDMAU'.indexOf(P(a).pos) - 'GDMAU'.indexOf(P(b).pos) || P(b).stars - P(a).stars)
+    .map(pid => cardHTML(P(pid), '', { tags: (xiSet.has(pid) ? '<span class="tag">titolare</span>' : '<span class="tag">riserva</span>') + tagsFor(pid) })))}
   <p class="muted">La formazione migliore (4-3-3) viene scelta da sola. I jolly giocano ovunque; un jolly in porta vale 1 stella. Difesa = portiere + 4 difensori, Attacco = 3 centrocampisti + 3 attaccanti.</p></div>`;
 }
 
@@ -141,12 +170,12 @@ function squadHTML() {
 function leagueHTML() {
   const rows = s.order || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], mgr = t => s.managers.find(m => m.club === t);
   const cups = [];
-  if (s.fa) cups.push(s.fa.winner ? `🏆 Coppa Italia: ${esc(D.TEAMS[s.fa.winner])}` : `Coppa Italia: ${s.managers.filter(m => s.fa.slots.includes(m.club)).map(m => esc(m.name)).join(', ') || 'nessun allenatore'} ancora in corsa`);
+  if (s.fa) cups.push(s.fa.winner ? `🏆 Coppa Italia: ${club(s.fa.winner)}` : `Coppa Italia: ${s.managers.filter(m => s.fa.slots.includes(m.club)).map(m => esc(m.name)).join(', ') || 'nessun allenatore'} ancora in corsa`);
   for (const k of ['EC', 'CWC', 'UEFA']) if (s.euro[k].ms.length || s.euro[k].winner != null)
     cups.push(`${D.COMP_NAME[k]}: ${s.euro[k].ms.map(i => esc(s.managers[i].name)).join(', ') || 'eliminati'}`);
   return `<div class="card"><h2>Serie A · stagione ${s.season}</h2><table><tr><th>#</th><th class="t">Squadra</th><th>G</th><th>V</th><th>N</th><th>P</th><th>DR</th><th>Pt</th></tr>
-  ${rows.map((t, i) => { const r = s.table[t], m = mgr(t); return `<tr class="${m?.i === 0 ? 'me' : ''}"><td>${i + 1}</td><td class="t">${m ? dot(m.i) + ' ' : ''}${esc(D.TEAMS[t])}</td><td>${r.p}</td><td>${r.w}</td><td>${r.d}</td><td>${r.l}</td><td>${r.f - r.a > 0 ? '+' : ''}${r.f - r.a}</td><td><b>${r.pts}</b></td></tr>`; }).join('')}</table>
-  <p class="muted">Vittoria ${s.points[0]} · pareggio ${s.points[1]} · sconfitta ${s.points[2]}. Dieci squadre, girone unico.</p></div>
+  ${rows.map((t, i) => { const r = s.table[t], m = mgr(t); return `<tr class="${m?.i === 0 ? 'me' : ''}" data-team="${t}"><td>${i + 1}</td><td class="t">${club(t, 20)}${m ? ' ' + dot(m.i) : ''}</td><td>${r.p}</td><td>${r.w}</td><td>${r.d}</td><td>${r.l}</td><td>${r.f - r.a > 0 ? '+' : ''}${r.f - r.a}</td><td><b>${r.pts}</b></td></tr>`; }).join('')}</table>
+  <p class="muted">Tocca una squadra per vedere la rosa. Vittoria ${s.points[0]} · pareggio ${s.points[1]} · sconfitta ${s.points[2]}.</p></div>
   ${s.lastResults ? `<div class="card"><h2>Ultimi risultati</h2>${linesHTML(s.lastResults)}</div>` : ''}
   ${cups.length ? `<div class="card"><h2>Coppe</h2>${cups.map(c => `<div style="padding:4px 0">${c}</div>`).join('')}</div>` : ''}
   <div class="card"><h2>Calendario</h2><div class="muted">${D.CALENDAR.map((c, i) => { const t = c[0] === 'L' ? 'A' + c[1] : (c[0] === 'F' ? 'CI ' : 'EU ') + ['1T', '2T', 'QF', 'SF', 'F'][c[1] - 1]; return i === s.week ? `<b style="color:var(--ink)">▶ ${t}</b>` : t; }).join(' · ')}</div>
@@ -160,27 +189,26 @@ function marketHTML() {
   let form = '';
   if (offer) {
     const o = offer;
-    form = `<div class="card hero"><h2>${o.buy ? 'Offerta di acquisto' : 'Offerta di vendita'}</h2>${pl(o.pid, `<span class="muted">valore ${g.money(g.nominal(o.pid))}</span>`)}
+    form = `<div class="card hero"><h2>${o.buy ? 'Offerta di acquisto' : 'Offerta di vendita'} · valore ${g.money(g.nominal(o.pid))}</h2><div class="solo">${cardHTML(P(o.pid))}</div>
       ${o.buy ? '' : `<label>A chi</label><select id="to">${cpus.map(m => `<option value="${m.i}">${esc(m.name)} · ${esc(D.TEAMS[m.club])}</option>`).join('')}</select>`}
       <label>Prezzo (€)</label><input id="price" type="number" inputmode="numeric" step="5000" min="5000" value="${g.nominal(o.pid) * (o.buy ? 2 : 1)}">
       <div class="btns"><button id="sendOffer">Invia offerta</button><button class="alt" id="cancelOffer">Annulla</button></div></div>`;
   }
+  const offerBtn = (kind, pid) => `<button class="small" data-offer="${kind}" data-pid="${pid}" ${!can || closed ? 'disabled' : ''}>Offri</button>`;
   return `${s.notice ? `<div class="notice">${esc(s.notice)}</div>` : ''}
   ${can ? '' : '<div class="notice">Puoi fare mercato a inizio turno, prima di tirare il dado.</div>'}${form}
   <div class="card"><h2>Banca</h2><div class="muted">Giocatori venduti alla banca. Prezzo minimo 1½ volte il valore; gli altri allenatori possono rilanciare.</div>
-  ${s.bank.length ? s.bank.map(pid => pl(pid, btn(`da ${g.money(Math.ceil(g.nominal(pid) * 1.5 / 5000) * 5000)}`, { type: 'bankBuy', pid }, { cls: 'small', dis: !can }))).join('') : '<p class="muted">La banca non ha giocatori.</p>'}</div>
+  ${s.bank.length ? cards(s.bank.map(pid => cardHTML(P(pid), btn(`da ${g.money(Math.ceil(g.nominal(pid) * 1.5 / 5000) * 5000)}`, { type: 'bankBuy', pid }, { cls: 'small', dis: !can })))) : '<p class="muted">La banca non ha giocatori.</p>'}</div>
   <div class="card"><h2>Compra da un allenatore</h2><div class="muted">${closed ? 'Mercato chiuso: si sono giocate le semifinali di coppa.' : 'Vende solo se il prezzo vale più di quanto il giocatore vale per lui.'}</div>
-  ${cpus.map(m => `<div class="rhead">${dot(m.i)} ${esc(m.name)} · ${esc(D.TEAMS[m.club])}</div>` + g.squad(s, m).filter(p => s.owner[p] === m.i).map(pid =>
-    pl(pid, `<button class="small" data-offer="buy" data-pid="${pid}" ${!can || closed ? 'disabled' : ''}>Offri</button>`)).join('')).join('')}</div>
-  <div class="card"><h2>Vendi a un allenatore</h2>
-  ${g.squad(s, h).filter(p => s.owner[p] === 0).map(pid => pl(pid, `<button class="small" data-offer="sell" data-pid="${pid}" ${!can || closed ? 'disabled' : ''}>Offri</button>`)).join('')}</div>`;
+  ${cpus.map(m => `<div class="rhead">${dot(m.i)} ${esc(m.name)} · ${club(m.club, 18)}</div>` + cards(g.squad(s, m).filter(p => s.owner[p] === m.i).map(pid => cardHTML(P(pid), offerBtn('buy', pid))))).join('')}</div>
+  <div class="card"><h2>Vendi a un allenatore</h2>${cards(g.squad(s, h).filter(p => s.owner[p] === 0).map(pid => cardHTML(P(pid), offerBtn('sell', pid))))}</div>`;
 }
 
 // ---------- ratings ----------
 function ratingsHTML(final = false) {
   const rows = [...s.managers].sort((a, b) => (b.bankrupt ? -1 : g.gamePoints(s, b)) - (a.bankrupt ? -1 : g.gamePoints(s, a)));
   const t = `<table><tr><th class="t">Allenatore</th><th>Camp.</th><th>CI</th><th>Eur</th><th>Cassa</th><th>Tot</th></tr>
-  ${rows.map(m => `<tr class="${m.i === 0 ? 'me' : ''}"><td class="t">${dot(m.i)} ${esc(m.name)}<br><span class="muted">${esc(D.TEAMS[m.club])} · ${g.money(m.cash)}</span></td>
+  ${rows.map(m => `<tr class="${m.i === 0 ? 'me' : ''}"><td class="t">${dot(m.i)} ${esc(m.name)}<br>${club(m.club, 16)}<br><span class="muted">${g.money(m.cash)}</span></td>
   <td>${m.k1 + (s.leagueStarted ? g.leaguePoints(s.pos[m.club]) : 0)}</td><td>${m.k2}</td><td>${m.k3}</td><td>${m.k7}</td><td><b>${m.bankrupt ? '—' : g.gamePoints(s, m)}</b></td></tr>`).join('')}</table>
   <p class="muted">Punti partita: piazzamento in campionato (1° = 15 … 10° = 1, sommati ogni stagione), turni di coppa vinti, e alla fine 1 punto ogni €50.000 in cassa.</p>`;
   return final ? t : `<div class="card"><h2>Classifica allenatori</h2>${t}</div>`;
@@ -190,10 +218,10 @@ function render() {
   if (!s) return setup();
   const h = me();
   if (s.pending?.type === 'results') s.lastResults = s.pending.lines;
-  const tabs = { play: ['🎲', 'Gioca'], squad: ['👕', 'Rosa'], league: ['🏆', 'Serie A'], market: ['💶', 'Mercato'], ratings: ['⭐', 'Punti'] };
+  const tabs = { play: ['🎲', 'Gioca'], squad: ['👕', 'Rose'], league: ['🏆', 'Serie A'], market: ['💶', 'Mercato'], ratings: ['⭐', 'Punti'] };
   const body = { play: () => pendingHTML() + boardHTML() + '<div style="height:14px"></div>' + feedHTML(), squad: squadHTML, league: leagueHTML, market: marketHTML, ratings: () => ratingsHTML() }[tab]();
   const waiting = s.pending && s.pending.type !== 'roll' && tab !== 'play' ? `<div class="notice">C'è una decisione da prendere in “Gioca”.</div>` : '';
-  app.innerHTML = `<header><div class="hrow"><div class="crest" style="background:${COLORS[0]};color:#2a2000">${esc(D.TEAMS[h.club].slice(0, 3).toUpperCase())}</div>
+  app.innerHTML = `<header><div class="hrow">${crest(h.club, 40)}
     <div class="club"><b>${esc(D.TEAMS[h.club])}</b><small>${esc(h.name)} · Stagione ${s.season}/${s.seasons} · ${s.finished ? 'finita' : esc(g.weekLabel(s))}</small></div></div>
     <div class="pills"><span class="pill gold">${g.money(h.cash)}</span><span class="pill">${g.gamePoints(s, h)} punti</span><span class="pill">${s.pos[h.club]}° in classifica</span></div></header>
   <main>${waiting}${body}</main>
@@ -201,9 +229,13 @@ function render() {
 }
 
 app.addEventListener('click', e => {
+  if (!s) return;
+  const row = e.target.closest('tr[data-team]');
+  if (row) { squadOf = +row.dataset.team; tab = 'squad'; render(); window.scrollTo(0, 0); return; }
   const b = e.target.closest('button');
   if (!b || b.disabled) return;
-  if (b.dataset.tab) { tab = b.dataset.tab; s.notice = null; offer = null; render(); window.scrollTo(0, 0); return; }
+  if (b.dataset.tab) { tab = b.dataset.tab; s.notice = null; offer = null; if (tab === 'squad') squadOf = null; render(); window.scrollTo(0, 0); return; }
+  if (b.dataset.team) { squadOf = +b.dataset.team; render(); return; }
   if (b.dataset.offer) { offer = { pid: +b.dataset.pid, buy: b.dataset.offer === 'buy' }; s.notice = null; render(); window.scrollTo(0, 0); return; }
   if (b.id === 'cancelOffer') { offer = null; render(); return; }
   if (b.id === 'sendOffer') {
@@ -213,7 +245,6 @@ app.addEventListener('click', e => {
   }
   const a = JSON.parse(b.dataset.a || 'null');
   if (!a) return;
-  if (a.view != null) { squadOf = a.view; render(); return; }
   if (a.type === 'new') { if (!confirmNew) { confirmNew = true; render(); return; } confirmNew = false; s = null; save(); render(); return; }
   if (a.type === 'bankBuy') tab = 'play';
   send(a);
