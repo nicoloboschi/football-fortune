@@ -25,8 +25,10 @@ export function squad(s, m) {
 }
 const owned = (s, m) => squad(s, m).filter(p => s.owner[p] === m.i); // excludes loaned-in
 
-// Best 4-3-3 from the squad. Utilities fill any gap or beat a weaker specialist; a utility in goal counts 1 star.
-export function lineup(s, m, { add = null, remove = null, withOut = false } = {}) {
+// Formations: defenders-midfielders-attackers. Defence = keeper + defenders, Attack = midfielders + attackers.
+export const FORMATIONS = ['4-3-3', '4-4-2', '3-5-2', '3-4-3', '4-5-1', '5-3-2', '5-4-1', '4-2-4'];
+// Best XI for the manager's formation. Utilities fill any gap or beat a weaker specialist; a utility in goal counts 1 star.
+export function lineup(s, m, { add = null, remove = null, withOut = false, f = m.formation || '4-3-3' } = {}) {
   let ps = squad(s, m).filter(p => p !== remove && (withOut || !s.out[p]));
   if (add != null) ps.push(add);
   const by = pos => ps.filter(p => D.PLAYERS[p].pos === pos).sort((a, b) => D.PLAYERS[b].stars - D.PLAYERS[a].stars);
@@ -34,7 +36,7 @@ export function lineup(s, m, { add = null, remove = null, withOut = false } = {}
   let gk = by('G')[0];
   let gkVal = gk != null ? D.PLAYERS[gk].stars : 0;
   if (gk == null && U.length) { gk = U.pop(); gkVal = 1; }
-  const slots = [['D', 4], ['M', 3], ['A', 3]].flatMap(([pos, n]) => {
+  const slots = f.split('-').map((n, k) => ['DMA'[k], +n]).flatMap(([pos, n]) => {
     const got = by(pos).slice(0, n);
     return Array.from({ length: n }, (_, i) => ({ pos, pid: got[i] ?? null }));
   });
@@ -189,6 +191,8 @@ export function playsThisWeek(s, m) {
 function playWeek(s) {
   const [type, round] = D.CALENDAR[s.week];
   for (const m of s.managers) {
+    // computer coaches pick the formation with the most stars on the pitch
+    if (!m.human && !m.bankrupt) m.formation = FORMATIONS.reduce((a, f) => strength(s, m, { f }) > strength(s, m, { f: a }) ? f : a, '4-3-3');
     const l = m.bankrupt ? { def: 0, att: 0, full: false } : lineup(s, m);
     s.A[m.club] = l.att; s.D[m.club] = l.def; m.fielded = l.full;
   }
@@ -639,8 +643,7 @@ export function newGame({ name = 'Mister', club = 1, level = 2, seasons = 2, poi
   const free = new Set(D.PLAYERS.map(p => p.id));
   const take = (pos, stars, m) => {
     const ok = [...free].filter(p => D.PLAYERS[p].pos === pos);
-    // a club's own players come first, unless that means being 2+ stars off the table
-    const dist = p => Math.abs(D.PLAYERS[p].stars - stars) + (D.PLAYERS[p].club === m.club ? 0 : 1.5);
+    const dist = p => Math.abs(D.PLAYERS[p].stars - stars);
     const bestDist = Math.min(...ok.map(dist));
     const p = shuffle(ok.filter(p => dist(p) === bestDist))[0];
     free.delete(p); s.owner[p] = m.i;
@@ -684,6 +687,7 @@ export function act(s, input) {
     }
     return trade(s, input);
   }
+  if (input.type === 'formation') { if (FORMATIONS.includes(input.f)) h.formation = input.f; return s; }
   // validate against what the pending prompt allows
   const mine = pid => s.owner[pid] === h.i && !loanOf(s, pid);
   const ok = {

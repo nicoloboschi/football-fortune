@@ -28,6 +28,6 @@ The save is `state.json` (server side, plus a browser copy), so a new tunnel URL
 - Italian text, Serie A instead of the First Division, Coppa Italia instead of the FA Cup, modern European clubs
   (kept in the original's strength tiers), euros instead of pounds.
 - Computer managers replace the other human players: they roll, bid, borrow and buy with simple rules.
-- The computer keeps the money and picks your best 4-3-3 (the original made you do both by hand).
+- You pick the formation (4-3-3, 4-4-2, 5-3-2...); the computer fills it with your best players and keeps the money.
 - Loans between managers only happen through Selection Problems cards; transfers are offers to a computer manager.
 - Computer club strengths ignore a manager who cannot field a side (the original would set every club to 0).

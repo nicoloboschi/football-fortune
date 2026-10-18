@@ -4,11 +4,11 @@ import { crest, avatar } from './art.js';
 
 const COLORS = ['#f2c230', '#e4002b', '#00a3e0', '#ff7a00', '#8a2be2', '#2bb673', '#ff5fa2', '#8b5a2b', '#9aa0a6', '#00c2c7'];
 const app = document.getElementById('app');
-let s = null, tab = 'play', lastDie = null, squadOf = null, offer = null, confirmNew = false;
+let s = null, tab = 'play', lastDie = null, squadOf = null, offer = null, confirmNew = false, anim = null;
 
 // ---------- persistence: server file (survives a new tunnel URL) + browser copy ----------
 async function load() {
-  try { const r = await fetch('api/state'); if (r.ok) { const j = await r.json(); return j?.v === 2 ? j : null; } } catch {} // server wins, even when reset
+  try { const r = await fetch('api/state'); if (r.ok || r.status === 404) { const j = await r.json(); return j?.v === 2 ? j : null; } } catch {} // server wins, even when reset
   try { const j = JSON.parse(localStorage.getItem('ff-save')); return j?.v === 2 ? j : null; } catch { return null; }
 }
 function save() {
@@ -29,19 +29,49 @@ const tagsFor = pid => (s.out[pid] ? '<span class="tag red">fuori 1 gara</span>'
 // Player card: level + stars, cartoon in his club shirt, first name, SURNAME, role. p = player object.
 function cardHTML(p, footer = '', { tags = '', big = false } = {}) {
   const sp = p.name.indexOf(' '), first = sp > 0 ? p.name.slice(0, sp) : '', last = sp > 0 ? p.name.slice(sp + 1) : p.name;
-  const fs = last.length > 14 ? 11 : last.length > 11 ? 13 : last.length > 8 ? 15 : 18;
+  const fs = last.length > 12 ? 9 : last.length > 9 ? 11 : last.length > 7 ? 12 : 14;
   return `<div class="pcard ${p.pos}${big ? ' big' : ''}"><div class="ph"><div><small>LIVELLO</small><div class="st">${'★'.repeat(p.stars)}<span>${'★'.repeat(5 - p.stars)}</span></div></div><div class="num">${p.stars}</div></div>
     <div class="art">${avatar(p)}<span class="pclub">${crest(p.club, 18)}</span></div>
-    <div class="first">${esc(first) || '&nbsp;'}</div><div class="last" style="font-size:${big ? fs + 4 : fs}px">${esc(last.toUpperCase())}</div>
+    <div class="first">${esc(first) || '&nbsp;'}</div><div class="last" style="font-size:${big ? fs + 6 : fs}px">${esc(last.toUpperCase())}</div>
     <div class="role">${D.POS_NAME[p.pos].toUpperCase()}</div>${tags ? `<div class="ctags">${tags}</div>` : ''}${footer ? `<div class="cfoot">${footer}</div>` : ''}</div>`;
 }
 const cards = list => `<div class="cards">${list.join('')}</div>`;
 
+const wait = ms => new Promise(r => setTimeout(r, ms));
 function send(input) {
-  if (input.type === 'roll') { const before = me().sq; g.act(s, input); lastDie = (me().sq - before + 36) % 36 || null; }
-  else g.act(s, input);
+  const prev = s.pending, tick = s.tick || 0;
+  if (input.type === 'roll') { const from = me().sq; g.act(s, input); lastDie = (me().sq - from + 36) % 36 || null; save(); return rollAnim(from); }
+  g.act(s, input);
   save(); render();
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (prev?.type === 'auction' && !(s.pending?.type === 'auction' && s.pending.pid === prev.pid)) auctionResult(prev.pid, tick);
+}
+
+// Die tumbles, lands on the number, then my token hops square by square.
+async function rollAnim(from) {
+  if (!lastDie) { render(); return; }
+  anim = { pos: from, face: 1 + g.rnd(6), rolling: true };
+  render();
+  document.querySelector('.board')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  for (let i = 0; i < 9; i++) { await wait(70); anim.face = 1 + g.rnd(6); const d = document.querySelector('.die'); if (d) d.textContent = anim.face; }
+  anim.face = lastDie; anim.rolling = false; render(); await wait(500);
+  for (let k = 1; k <= lastDie; k++) { anim.pos = (from + k) % 36; render(); await wait(230); }
+  await wait(600);
+  anim = null; render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Full-screen card with a stamp: won (confetti), lost to someone (shake), or unsold.
+function auctionResult(pid, tick) {
+  const owner = s.owner[pid], won = owner === 0, sold = typeof owner === 'number';
+  const text = s.log.filter(l => l.t > tick).map(l => l.text).find(t => t.includes(' compra ') || t.startsWith('Nessuna offerta')) || '';
+  const el = document.createElement('div');
+  el.className = `overlay ${won ? 'won' : sold ? 'lost' : 'none'}`;
+  const bits = won ? Array.from({ length: 28 }, (_, i) => `<i style="left:${g.rnd(100)}%;background:${COLORS[i % 5]};animation-delay:${g.rnd(500)}ms;animation-duration:${1400 + g.rnd(900)}ms"></i>`).join('') : '';
+  el.innerHTML = `${bits}<div class="obox"><div class="ocard">${cardHTML(P(pid), '', { big: true })}<div class="stamp">${won ? 'TUO!' : sold ? 'PERSO' : 'INVENDUTO'}</div></div>
+    <div class="otext">${sold && !won ? dot(owner) + ' ' : ''}${esc(text)}</div><button class="big">Avanti</button></div>`;
+  el.addEventListener('click', () => el.remove());
+  document.body.appendChild(el);
 }
 
 // ---------- setup ----------
@@ -71,10 +101,12 @@ function boardHTML() {
   const at = i => i <= 9 ? [1, i + 1] : i <= 18 ? [i - 8, 10] : i <= 27 ? [10, 28 - i] : [37 - i, 1];
   const cells = D.BOARD.map((sq, i) => {
     const [r, c] = at(i), info = D.SQUARE[sq];
-    const dots = s.managers.filter(m => m.sq === i && !m.bankrupt).map(m => dot(m.i)).join('');
-    return `<div class="sq${i === me().sq ? ' here' : ''}" style="grid-row:${r};grid-column:${c};background:${info.color}" title="${esc(info.label)}">${info.icon}<span class="dots">${dots}</span></div>`;
+    const posOf = m => m.human && anim ? anim.pos : m.sq;
+    const dots = s.managers.filter(m => posOf(m) === i && !m.bankrupt).map(m => m.human ? `<span class="dot tok" style="background:${COLORS[0]}"></span>` : dot(m.i)).join('');
+    return `<div class="sq${i === (anim ? anim.pos : me().sq) ? ' here' : ''}" style="grid-row:${r};grid-column:${c};background:${info.color}" title="${esc(info.label)}">${info.icon}<span class="dots">${dots}</span></div>`;
   });
-  cells.push(`<div class="centre">${lastDie ? `<div class="die">${lastDie}</div>` : ''}<b>${esc(D.SQUARE[D.BOARD[me().sq]].label)}</b>
+  const face = anim ? anim.face : lastDie, where = anim ? anim.pos : me().sq;
+  cells.push(`<div class="centre">${face ? `<div class="die${anim?.rolling ? ' rolling' : anim ? ' landed' : ''}">${face}</div>` : ''}<b>${esc(D.SQUARE[D.BOARD[where]].label)}</b>
     <div class="legend">${s.managers.filter(m => !m.bankrupt).map(m => `<span>${dot(m.i)}${esc(m.name)}</span>`).join('')}</div></div>`);
   return `<div class="board">${cells.join('')}</div>`;
 }
@@ -108,7 +140,7 @@ function pendingHTML() {
       const mine = g.squad(s, h).filter(pid => s.owner[pid] === 0), xi = new Set(g.lineup(s, h, { withOut: true }).xi);
       return `<div class="card hero"><h2>${p.forced ? 'Servono soldi' : 'Banca'}</h2>
       <h3>${p.forced ? `Ti mancano ${g.money(p.need)}` : 'Vendi alla banca'}</h3>
-      <div class="muted">${p.forced ? 'Non puoi pagare: vendi giocatori alla banca a ¾ del loro valore.' : 'Puoi vendere giocatori alla banca a ¾ del valore. Tieni abbastanza uomini per il 4-3-3!'}</div>
+      <div class="muted">${p.forced ? 'Non puoi pagare: vendi giocatori alla banca a ¾ del loro valore.' : 'Puoi vendere giocatori alla banca a ¾ del valore. Tieni abbastanza uomini per il tuo modulo!'}</div>
       ${cards(mine.map(pid => cardHTML(P(pid), btn(`Vendi ${g.money(g.nominal(pid) * 3 / 4)}`, { type: 'sell', pid }, { cls: 'small' }), { tags: (xi.has(pid) ? '<span class="tag">titolare</span>' : '') + tagsFor(pid) })))}
       ${p.forced ? '' : btn('Fatto', { type: 'done' }, { cls: 'big' })}</div>`;
     }
@@ -150,12 +182,15 @@ function squadHTML() {
   if (!m) return picker + `<div class="card"><h3>${club(team, 26)}</h3><p class="muted">Allenatore in bancarotta: la squadra non ha più giocatori.</p></div>`;
   const lu = g.lineup(s, m), all = g.squad(s, m), xiSet = new Set(lu.xi), byPos = pos => lu.slots.filter(x => x.pos === pos).map(x => x.pid == null ? null : P(x.pid));
   return picker + `<div class="card"><h2>${dot(m.i)} ${esc(m.name)}${m.bankrupt ? ' · in bancarotta' : ''}</h2><h3>${club(team, 26)}</h3>${sums(lu.def, lu.att)}
-  ${lu.full ? '' : '<div class="notice" style="margin-top:10px">Non riesci a schierare un 4-3-3 completo: forza 0 e niente incasso!</div>'}
+  ${lu.full ? '' : `<div class="notice" style="margin-top:10px">Non riesci a schierare un ${m.formation || '4-3-3'} completo: forza 0 e niente incasso!</div>`}
+  <div class="rhead">Modulo ${esc(m.formation || '4-3-3')}</div>
+  ${m.human ? `<div class="tactics">${g.FORMATIONS.map(f => { const l = g.lineup(s, m, { f });
+    return btn(`<b>${f}</b><small>${l.full ? `Dif ${l.def} · Att ${l.att}` : 'incompleto'}</small>`, { type: 'formation', f }, { cls: (m.formation || '4-3-3') === f ? 'on' : 'alt' }); }).join('')}</div>` : ''}
   ${pitch([byPos('A'), byPos('M'), byPos('D'), [lu.gk == null ? null : P(lu.gk)]])}
   <div class="muted" style="margin-top:10px">Cassa ${g.money(m.cash)} · Stipendi ${g.money(g.wages(s, m))} · Carte Immunità ${m.immunity}</div></div>
   <div class="card"><h2>Rosa · ${all.length} giocatori</h2>${cards(all.sort((a, b) => 'GDMAU'.indexOf(P(a).pos) - 'GDMAU'.indexOf(P(b).pos) || P(b).stars - P(a).stars)
     .map(pid => cardHTML(P(pid), '', { tags: (xiSet.has(pid) ? '<span class="tag">titolare</span>' : '<span class="tag">riserva</span>') + tagsFor(pid) })))}
-  <p class="muted">La formazione migliore (4-3-3) viene scelta da sola. I jolly giocano ovunque; un jolly in porta vale 1 stella. Difesa = portiere + 4 difensori, Attacco = 3 centrocampisti + 3 attaccanti.</p></div>`;
+  <p class="muted">Scegli il modulo, i migliori giocatori vengono messi da soli. Più difensori alzano la Difesa, più centrocampisti e attaccanti l'Attacco. I jolly giocano ovunque; un jolly in porta vale 1 stella.</p></div>`;
 }
 
 // ---------- league ----------
@@ -211,17 +246,21 @@ function render() {
   const h = me();
   if (s.pending?.type === 'results') s.lastResults = s.pending.lines;
   const tabs = { play: ['🎲', 'Gioca'], squad: ['👕', 'Rose'], league: ['🏆', 'Serie A'], market: ['💶', 'Mercato'], ratings: ['⭐', 'Punti'] };
-  const body = { play: () => pendingHTML() + boardHTML() + '<div style="height:14px"></div>' + feedHTML(), squad: squadHTML, league: leagueHTML, market: marketHTML, ratings: () => ratingsHTML() + `<div class="card"><h3>Ricomincia</h3><div class="muted">Cancella questa partita e ne inizia una nuova.</div>${btn(confirmNew ? 'Sicuro? Tocca ancora' : 'Ricomincia da capo', { type: 'new' }, { cls: confirmNew ? 'big' : 'alt big' })}</div>` }[tab]();
+  const body = { play: () => anim ? boardHTML() : pendingHTML() + boardHTML() + '<div style="height:14px"></div>' + feedHTML(), squad: squadHTML, league: leagueHTML, market: marketHTML, ratings: () => ratingsHTML() + `<div class="card"><h3>Ricomincia</h3><div class="muted">Cancella questa partita e ne inizia una nuova.</div>${btn(confirmNew ? 'Sicuro? Tocca ancora' : 'Ricomincia da capo', { type: 'new' }, { cls: confirmNew ? 'big' : 'alt big' })}</div>` }[tab]();
   const waiting = s.pending && s.pending.type !== 'roll' && tab !== 'play' ? `<div class="notice">C'è una decisione da prendere in “Gioca”.</div>` : '';
   app.innerHTML = `<header><div class="hrow">${crest(h.club, 40)}
     <div class="club"><b>${esc(D.TEAMS[h.club])}</b><small>${esc(h.name)} · Stagione ${s.season}/${s.seasons} · ${s.finished ? 'finita' : esc(g.weekLabel(s))}</small></div></div>
     <div class="pills"><span class="pill gold">${g.money(h.cash)}</span><span class="pill">${g.gamePoints(s, h)} punti</span><span class="pill">${s.pos[h.club]}° in classifica</span></div></header>
   <main>${waiting}${body}</main>
+  <div class="actbar"></div>
   <nav>${Object.entries(tabs).map(([k, [ic, v]]) => `<button data-tab="${k}" class="${k === tab ? 'on' : ''}"><span>${ic}</span>${v}</button>`).join('')}</nav>`;
+  // the card's main button (roll, next, pass...) sits in a bar above the tabs, always in reach
+  const main = tab === 'play' && !anim && app.querySelector('main .hero > button.big:last-child');
+  if (main) app.querySelector('.actbar').appendChild(main);
 }
 
 app.addEventListener('click', e => {
-  if (!s) return;
+  if (!s || anim) return;
   const row = e.target.closest('tr[data-team]');
   if (row) { squadOf = +row.dataset.team; tab = 'squad'; render(); window.scrollTo(0, 0); return; }
   const b = e.target.closest('button');
@@ -238,6 +277,7 @@ app.addEventListener('click', e => {
   const a = JSON.parse(b.dataset.a || 'null');
   if (!a) return;
   if (a.type === 'new') { if (!confirmNew) { confirmNew = true; render(); return; } confirmNew = false; s = null; tab = 'play'; save(); render(); return; }
+  if (a.type === 'formation') { g.act(s, a); save(); render(); return; }
   if (a.type === 'bankBuy') tab = 'play';
   send(a);
 });
