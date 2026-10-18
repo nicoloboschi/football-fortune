@@ -8,7 +8,7 @@ let s = null, tab = 'play', lastDie = null, squadOf = null, offer = null, confir
 
 // ---------- persistence: server file (survives a new tunnel URL) + browser copy ----------
 async function load() {
-  try { const r = await fetch('api/state'); if (r.ok) { const j = await r.json(); if (j && j.v === 2) return j; } } catch {}
+  try { const r = await fetch('api/state'); if (r.ok) { const j = await r.json(); return j?.v === 2 ? j : null; } } catch {} // server wins, even when reset
   try { const j = JSON.parse(localStorage.getItem('ff-save')); return j?.v === 2 ? j : null; } catch { return null; }
 }
 function save() {
@@ -219,7 +219,7 @@ function render() {
   const h = me();
   if (s.pending?.type === 'results') s.lastResults = s.pending.lines;
   const tabs = { play: ['🎲', 'Gioca'], squad: ['👕', 'Rose'], league: ['🏆', 'Serie A'], market: ['💶', 'Mercato'], ratings: ['⭐', 'Punti'] };
-  const body = { play: () => pendingHTML() + boardHTML() + '<div style="height:14px"></div>' + feedHTML(), squad: squadHTML, league: leagueHTML, market: marketHTML, ratings: () => ratingsHTML() }[tab]();
+  const body = { play: () => pendingHTML() + boardHTML() + '<div style="height:14px"></div>' + feedHTML(), squad: squadHTML, league: leagueHTML, market: marketHTML, ratings: () => ratingsHTML() + `<div class="card"><h3>Ricomincia</h3><div class="muted">Cancella questa partita e ne inizia una nuova.</div>${btn(confirmNew ? 'Sicuro? Tocca ancora' : 'Ricomincia da capo', { type: 'new' }, { cls: confirmNew ? 'big' : 'alt big' })}</div>` }[tab]();
   const waiting = s.pending && s.pending.type !== 'roll' && tab !== 'play' ? `<div class="notice">C'è una decisione da prendere in “Gioca”.</div>` : '';
   app.innerHTML = `<header><div class="hrow">${crest(h.club, 40)}
     <div class="club"><b>${esc(D.TEAMS[h.club])}</b><small>${esc(h.name)} · Stagione ${s.season}/${s.seasons} · ${s.finished ? 'finita' : esc(g.weekLabel(s))}</small></div></div>
@@ -234,7 +234,7 @@ app.addEventListener('click', e => {
   if (row) { squadOf = +row.dataset.team; tab = 'squad'; render(); window.scrollTo(0, 0); return; }
   const b = e.target.closest('button');
   if (!b || b.disabled) return;
-  if (b.dataset.tab) { tab = b.dataset.tab; s.notice = null; offer = null; if (tab === 'squad') squadOf = null; render(); window.scrollTo(0, 0); return; }
+  if (b.dataset.tab) { tab = b.dataset.tab; confirmNew = false; s.notice = null; offer = null; if (tab === 'squad') squadOf = null; render(); window.scrollTo(0, 0); return; }
   if (b.dataset.team) { squadOf = +b.dataset.team; render(); return; }
   if (b.dataset.offer) { offer = { pid: +b.dataset.pid, buy: b.dataset.offer === 'buy' }; s.notice = null; render(); window.scrollTo(0, 0); return; }
   if (b.id === 'cancelOffer') { offer = null; render(); return; }
@@ -245,7 +245,7 @@ app.addEventListener('click', e => {
   }
   const a = JSON.parse(b.dataset.a || 'null');
   if (!a) return;
-  if (a.type === 'new') { if (!confirmNew) { confirmNew = true; render(); return; } confirmNew = false; s = null; save(); render(); return; }
+  if (a.type === 'new') { if (!confirmNew) { confirmNew = true; render(); return; } confirmNew = false; s = null; tab = 'play'; save(); render(); return; }
   if (a.type === 'bankBuy') tab = 'play';
   send(a);
 });
