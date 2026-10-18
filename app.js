@@ -346,5 +346,10 @@ app.addEventListener('click', e => {
   send(a);
 });
 
+// a page left open on the phone picks up new game code when you come back to it
+const version = () => fetch('api/version').then(r => r.text()).catch(() => null);
+const v0 = await version();
+document.addEventListener('visibilitychange', async () => { if (document.hidden || anim || !v0) return; const v = await version(); if (v && v !== v0) location.reload(); });
+
 s = await load();
 render();

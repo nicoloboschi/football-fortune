@@ -18,6 +18,8 @@ class H(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split("?")[0]
+        if path == "/api/version":  # changes whenever a game file changes, so open pages can reload
+            return self.send(200, str(max(os.path.getmtime(os.path.join(ROOT, f)) for f in set(FILES.values()))).encode())
         if path == "/api/state":
             return self.send(200, open(STATE, "rb").read()) if os.path.exists(STATE) else self.send(404, b"null")
         if path not in FILES:  # only the game's own files, nothing else from disk
