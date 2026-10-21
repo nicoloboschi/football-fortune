@@ -162,6 +162,7 @@ function setComputerStrengths(s) {
   const g1 = 31 + rnd(10); let g2 = 31 + rnd(9); if (g2 >= g1) g2++;
   s.giants = { [g1]: [s.A[g1], s.D[g1]], [g2]: [s.A[g2], s.D[g2]] };
   for (const g of [g1, g2]) set(g, AL + 5, DL + 4);
+  for (const k of ['EC', 'CWC', 'UEFA']) for (const t of D.EURO_POOL[k]) set(t, s.A[t] + D.EURO_BOOST[k], s.D[t] + D.EURO_BOOST[k]);
 }
 
 function drawFA(s) {
@@ -246,8 +247,8 @@ function playWeek(s) {
         return win;
       };
       const clubs = c.ms.map(i => s.managers[i].club);
-      if (clubs.length === 2 && c.meet) tie(clubs[0], clubs[1], gate(s, clubs[0], clubs[1], D.GATE_BONUS[k][round - 1]));
-      else for (const t of clubs) { const o = nextOpp(c); tie(t, o, gateVsForeign(s, t, o, D.GATE_BONUS[k][round - 1])); }
+      if (clubs.length === 2 && c.meet) tie(clubs[0], clubs[1], gate(s, clubs[0], clubs[1], D.GATE_BONUS[k][round - 1]) * D.EURO_GATE_MULT[k]);
+      else for (const t of clubs) { const o = nextOpp(c); tie(t, o, gateVsForeign(s, t, o, D.GATE_BONUS[k][round - 1]) * D.EURO_GATE_MULT[k]); }
       c.meet = c.ms.length === 2 && Math.random() * (D.CUP_TEAMS[round - 1] / 2 - 1) <= 1;
       if (round === 5 && c.ms.length) { c.winner = c.ms[0]; note(`${who(s, s.managers[c.winner])} vince la ${D.COMP_NAME[k]}!`); }
     }
@@ -257,7 +258,7 @@ function playWeek(s) {
       const bonus = D.GATE_BONUS.UEFA[round - 1];
       if (round === 1) {
         u.ms.forEach((mi, z) => {
-          const t = s.managers[mi].club, o = u.pool[z], [x, y] = cupScore(s, t, o), g = gateVsForeign(s, t, o, bonus);
+          const t = s.managers[mi].club, o = u.pool[z], [x, y] = cupScore(s, t, o), g = gateVsForeign(s, t, o, bonus) * D.EURO_GATE_MULT.UEFA;
           pay(t, g); match(t, o, x, y, g);
           if (x > y) u.pool[z] = t;
         });
@@ -267,7 +268,7 @@ function playWeek(s) {
         for (let z = 0; z < H; z++) {
           const [h, a] = [p[z], p[z + H]], [x, y] = cupScore(s, h, a), win = x > y ? h : a;
           if (isM(h) || isM(a)) {
-            const g = gate(s, h, a, bonus); pay(h, g); pay(a, g);
+            const g = gate(s, h, a, bonus) * D.EURO_GATE_MULT.UEFA; pay(h, g); pay(a, g);
             match(h, a, x, y, g);
             const wm = managerOf(s, win); if (wm) wm.k3 += D.CUP_POINTS.UEFA[round - 1];
           }
@@ -613,7 +614,7 @@ const TASKS = {
       s.leagueStarted = false;
     }
     if (!t.input) { s.pending = { type: 'results', title: `Fine della stagione ${s.season}`, lines: t.lines }; return false; }
-    if (s.season >= s.seasons) {
+    if (s.seasons && s.season >= s.seasons) { // seasons 0 = endless
       for (const m of active(s)) m.k7 = Math.floor(m.cash / 50000);
       after(s, { k: 'over', why: 'La partita è finita.' });
       return true;

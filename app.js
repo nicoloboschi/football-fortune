@@ -54,7 +54,7 @@ function strengthOf(t) {
 // every coach at a glance: league position, Defence/Attack, cash
 function coachesHTML() {
   return `<div class="coaches">${g.active(s).sort((x, y) => s.pos[x.club] - s.pos[y.club]).map(m => { const l = g.lineup(s, m);
-    return `<button class="coach${m.human ? ' me' : ''}" data-team="${m.club}">${crest(m.club, 16)}<span><b>${s.pos[m.club]}° ${esc(m.name)}</b>
+    return `<button class="coach${m.human ? ' me' : ''}" data-team="${m.club}">${crest(m.club, 16)}<span><b>${s.pos[m.club]}° ${esc(m.name)} · ${g.gamePoints(s, m)} pt</b>
       <small>D${l.def} A${l.att} · ${short(m.cash)}</small></span></button>`; }).join('')}</div>`;
 }
 
@@ -157,7 +157,7 @@ function setup() {
     <label>Il tuo nome</label><input id="name" value="Nicolò" maxlength="14">
     <label>La tua squadra</label><div class="clubpick">${D.TEAMS.slice(1, 11).map((t, i) => `<button class="alt small${i ? '' : ' on'}" data-club="${i + 1}">${crest(i + 1, 24)}<span>${t}</span></button>`).join('')}</div>
     <label>Difficoltà (forza delle avversarie in coppa)</label><select id="level"><option value="1">1 · Facile</option><option value="2" selected>2 · Media</option><option value="3">3 · Difficile</option><option value="4">4 · Esperto</option></select>
-    <label>Stagioni</label><select id="seasons"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option></select>
+    <label>Stagioni</label><select id="seasons"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option><option value="0">Infinite</option></select>
     <button class="big" id="start">Fischio d'inizio</button>
   </div></main>`;
   let pickedClub = 1;
@@ -326,8 +326,8 @@ function render() {
   const body = { play: () => anim ? boardHTML() : pendingHTML() + boardHTML() + '<div style="height:14px"></div>' + feedHTML(), squad: squadHTML, league: leagueHTML, market: marketHTML, ratings: () => ratingsHTML() + `<div class="card"><h3>Ricomincia</h3><div class="muted">Cancella questa partita e ne inizia una nuova.</div>${btn(confirmNew ? 'Sicuro? Tocca ancora' : 'Ricomincia da capo', { type: 'new' }, { cls: confirmNew ? 'big' : 'alt big' })}</div>` }[tab]();
   const waiting = s.pending && s.pending.type !== 'roll' && tab !== 'play' ? `<div class="notice">C'è una decisione da prendere in “Gioca”.</div>` : '';
   app.innerHTML = `<header><div class="hrow">${crest(h.club, 40)}
-    <div class="club"><b>${esc(D.TEAMS[h.club])}</b><small>${esc(h.name)} · Stagione ${s.season}/${s.seasons} · ${s.finished ? 'finita' : esc(g.weekLabel(s))}</small></div></div>
-    <div class="pills"><span class="pill gold">${g.money(h.cash)}</span><span class="pill">${g.gamePoints(s, h)} punti</span><span class="pill">${s.pos[h.club]}° in classifica</span></div>${tab === 'play' ? coachesHTML() : ''}</header>
+    <div class="club"><b>${esc(D.TEAMS[h.club])}</b><small>${esc(h.name)} · Stagione ${s.season}${s.seasons ? '/' + s.seasons : ''} · ${s.finished ? 'finita' : esc(g.weekLabel(s))}</small></div></div>
+    <div class="pills"><span class="pill gold">${g.money(h.cash)}</span><span class="pill">${g.gamePoints(s, h)} punti</span><span class="pill">${s.pos[h.club]}° in classifica</span></div>${coachesHTML()}</header>
   <main>${waiting}${body}</main>
   <div class="actbar"></div>
   <nav>${Object.entries(tabs).map(([k, [ic, v]]) => `<button data-tab="${k}" class="${k === tab ? 'on' : ''}"><span>${ic}</span>${v}</button>`).join('')}</nav>`;

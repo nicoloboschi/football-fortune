@@ -152,6 +152,9 @@ export const CUP_TEAMS = [32, 16, 8, 4, 2];
 // Game points per cup round won, and gate bonus (x1,000) per round: program matrix M()
 export const CUP_POINTS = { FA: [0, 2, 2, 3, 4], UEFA: [0, 4, 4, 4, 3], CWC: [0, 6, 4, 5, 6], EC: [0, 10, 6, 7, 7] };
 export const GATE_BONUS = { FA: [0, 1, 10, 20, 30], UEFA: [0, 1, 10, 20, 30], CWC: [0, 10, 20, 30, 40], EC: [0, 20, 30, 50, 70] };
+// ponytail: house rule, not the original: European ties pay more and foreign clubs are tougher (+ to both Attack and Defence)
+export const EURO_GATE_MULT = { EC: 3, CWC: 2, UEFA: 1.5 };
+export const EURO_BOOST = { EC: 4, CWC: 2, UEFA: 1 };
 export const COMP_NAME = { FA: 'Coppa Italia', EC: 'Coppa dei Campioni', CWC: 'Coppa delle Coppe', UEFA: 'Coppa UEFA' };
 
 // Fortuna (Manager's Luck): amount > 0 receive, < 0 pay

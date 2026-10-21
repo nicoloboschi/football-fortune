@@ -63,3 +63,7 @@ assert.deepEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(g.leaguePoints), [15, 12, 1
 { const s = g.newGame({ club: 3 });
   assert.deepEqual(s.managers.map(m => m.club).sort((a, b) => a - b), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
   for (const m of s.managers) assert.equal(g.squad(s, m).length, 13); }
+// endless option: seasons 0 keeps going past season 3
+{ let s = g.newGame({ seasons: 0 });
+  for (let i = 0; i < 40000 && s.season < 4 && !s.finished; i++) g.act(s, randomInput(s));
+  assert(s.season >= 4 || (s.finished && s.managers[0].bankrupt), `endless game stopped in season ${s.season}`); }
