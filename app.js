@@ -54,7 +54,7 @@ function strengthOf(t) {
 // every coach at a glance: league position, Defence/Attack, cash
 function coachesHTML() {
   return `<div class="coaches">${g.active(s).sort((x, y) => s.pos[x.club] - s.pos[y.club]).map(m => { const l = g.lineup(s, m);
-    return `<button class="coach${m.human ? ' me' : ''}" data-team="${m.club}">${crest(m.club, 16)}<span><b>${s.pos[m.club]}° ${esc(m.name)} · ${g.gamePoints(s, m)} pt</b>
+    return `<button class="coach${m.human ? ' me' : ''}" data-team="${m.club}">${crest(m.club, 16)}<span><b>${s.pos[m.club]}° ${esc(m.name)} · ${s.table[m.club].pts} pt</b>
       <small>D${l.def} A${l.att} · ${short(m.cash)}</small></span></button>`; }).join('')}</div>`;
 }
 
